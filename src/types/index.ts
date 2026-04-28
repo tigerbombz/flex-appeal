@@ -12,6 +12,8 @@ export interface Player {
   trend: 'up' | 'neutral' | 'down';
   score: number;
   status: 'active' | 'questionable' | 'out';
+  matchupDifficulty: 'Easy' | 'Medium' | 'Hard';
+  isLocked: boolean;
 }
 
 export interface League {
@@ -52,4 +54,15 @@ export interface CurrentMatchup {
   opponentRecord: string;
   opponentProjected: number;
   myProjected: number;
+}
+
+export interface LeagueSettings {
+  scoringFormat: 'PPR' | 'Half' | 'Standard';
+  flexPositions: ('RB' | 'WR' | 'TE')[];
+  rosterSlots: string[];
+}
+
+export interface PlayerWithMatchup extends Player {
+  matchupDifficulty: 'Easy' | 'Medium' | 'Hard';
+  isLocked: boolean;
 }

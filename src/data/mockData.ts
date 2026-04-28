@@ -1,4 +1,4 @@
-import type { League, Roster, LineupEvaluation, WeeklyMatchup, CurrentMatchup } from '../types';
+import type { League, Player, Roster, LineupEvaluation, WeeklyMatchup, CurrentMatchup } from '../types';
 
 export const mockLeague: League = {
   name: 'The Gridiron Gazette',
@@ -27,6 +27,8 @@ export const mockRoster: Roster = {
       trend: 'up',
       score: 88,
       status: 'active',
+      matchupDifficulty: 'Hard',
+      isLocked: false,
     },
     {
       id: 2,
@@ -42,6 +44,8 @@ export const mockRoster: Roster = {
       trend: 'up',
       score: 81,
       status: 'active',
+      matchupDifficulty: 'Hard',
+      isLocked: false,
     },
     {
       id: 3,
@@ -57,6 +61,8 @@ export const mockRoster: Roster = {
       trend: 'up',
       score: 75,
       status: 'active',
+      matchupDifficulty: 'Hard',
+      isLocked: false,
     },
     {
       id: 4,
@@ -72,6 +78,8 @@ export const mockRoster: Roster = {
       trend: 'up',
       score: 84,
       status: 'active',
+      matchupDifficulty: 'Medium',
+      isLocked: false,
     },
     {
       id: 5,
@@ -87,6 +95,8 @@ export const mockRoster: Roster = {
       trend: 'neutral',
       score: 77,
       status: 'active',
+      matchupDifficulty: 'Easy',
+isLocked: false,
     },
     {
       id: 6,
@@ -102,6 +112,8 @@ export const mockRoster: Roster = {
       trend: 'down',
       score: 68,
       status: 'active',
+      matchupDifficulty: 'Easy',
+isLocked: false,
     },
     {
       id: 7,
@@ -117,6 +129,8 @@ export const mockRoster: Roster = {
       trend: 'neutral',
       score: 71,
       status: 'active',
+      matchupDifficulty: 'Medium',
+isLocked: false,
     },
     {
       id: 8,
@@ -132,6 +146,8 @@ export const mockRoster: Roster = {
       trend: 'up',
       score: 74,
       status: 'active',
+      matchupDifficulty: 'Easy',
+isLocked: false,
     },
     {
       id: 9,
@@ -147,6 +163,8 @@ export const mockRoster: Roster = {
       trend: 'neutral',
       score: 61,
       status: 'active',
+      matchupDifficulty: 'Medium',
+isLocked: false,
     },
   ],
   bench: [
@@ -164,6 +182,8 @@ export const mockRoster: Roster = {
       trend: 'up',
       score: 76,
       status: 'active',
+      matchupDifficulty: 'Easy',
+isLocked: false,
     },
     {
       id: 11,
@@ -179,6 +199,8 @@ export const mockRoster: Roster = {
       trend: 'neutral',
       score: 54,
       status: 'active',
+      matchupDifficulty: 'Easy',
+      isLocked: false,
     },
     {
       id: 12,
@@ -194,6 +216,8 @@ export const mockRoster: Roster = {
       trend: 'up',
       score: 63,
       status: 'questionable',
+      matchupDifficulty: 'Easy',
+isLocked: false,
     },
     {
       id: 13,
@@ -209,6 +233,8 @@ export const mockRoster: Roster = {
       trend: 'up',
       score: 66,
       status: 'active',
+      matchupDifficulty: 'Hard',
+isLocked: false,
     },
     {
       id: 14,
@@ -224,6 +250,8 @@ export const mockRoster: Roster = {
       trend: 'neutral',
       score: 57,
       status: 'active',
+      matchupDifficulty: 'Easy',
+isLocked: false,
     },
     {
       id: 15,
@@ -239,6 +267,8 @@ export const mockRoster: Roster = {
       trend: 'neutral',
       score: 64,
       status: 'questionable',
+      matchupDifficulty: 'Medium',
+isLocked: false,
     },
     {
       id: 16,
@@ -254,6 +284,8 @@ export const mockRoster: Roster = {
       trend: 'down',
       score: 48,
       status: 'active',
+      matchupDifficulty: 'Easy',
+isLocked: false,
     },
   ],
 };
@@ -308,3 +340,40 @@ export const mockCurrentMatchup: CurrentMatchup = {
   opponentProjected: 118.4,
   myProjected: 131.2,
 };
+
+export const nflPlayerPool: Player[] = [
+  // QBs
+  { id: 101, name: 'Patrick Mahomes', position: 'QB', slot: 'QB', team: 'KC', opponent: 'LV', vegasProp: null, teamTotal: 28, avgYards: null, usage: 'High', trend: 'up', score: 91, status: 'active', matchupDifficulty: 'Easy', isLocked: false },
+  { id: 102, name: 'Josh Allen', position: 'QB', slot: 'QB', team: 'BUF', opponent: 'NYJ', vegasProp: null, teamTotal: 27, avgYards: null, usage: 'High', trend: 'up', score: 89, status: 'active', matchupDifficulty: 'Easy', isLocked: false },
+  { id: 103, name: 'Jalen Hurts', position: 'QB', slot: 'QB', team: 'PHI', opponent: 'DAL', vegasProp: null, teamTotal: 26, avgYards: null, usage: 'High', trend: 'neutral', score: 85, status: 'active', matchupDifficulty: 'Medium', isLocked: false },
+  { id: 104, name: 'Joe Burrow', position: 'QB', slot: 'QB', team: 'CIN', opponent: 'BAL', vegasProp: null, teamTotal: 24, avgYards: null, usage: 'High', trend: 'up', score: 83, status: 'questionable', matchupDifficulty: 'Hard', isLocked: false },
+  { id: 105, name: 'Dak Prescott', position: 'QB', slot: 'QB', team: 'DAL', opponent: 'PHI', vegasProp: null, teamTotal: 22, avgYards: null, usage: 'High', trend: 'neutral', score: 79, status: 'active', matchupDifficulty: 'Hard', isLocked: false },
+  { id: 106, name: 'Tua Tagovailoa', position: 'QB', slot: 'QB', team: 'MIA', opponent: 'NE', vegasProp: null, teamTotal: 26, avgYards: null, usage: 'High', trend: 'up', score: 80, status: 'active', matchupDifficulty: 'Easy', isLocked: false },
+  { id: 107, name: 'Jordan Love', position: 'QB', slot: 'QB', team: 'GB', opponent: 'DET', vegasProp: null, teamTotal: 23, avgYards: null, usage: 'Medium', trend: 'up', score: 76, status: 'active', matchupDifficulty: 'Medium', isLocked: false },
+
+  // RBs
+  { id: 108, name: 'Derrick Henry', position: 'RB', slot: 'RB1', team: 'TEN', opponent: 'IND', vegasProp: 72.0, teamTotal: 20, avgYards: 78, usage: 'High', trend: 'neutral', score: 74, status: 'active', matchupDifficulty: 'Medium', isLocked: false },
+  { id: 109, name: 'Breece Hall', position: 'RB', slot: 'RB1', team: 'NYJ', opponent: 'BUF', vegasProp: 55.0, teamTotal: 18, avgYards: 61, usage: 'High', trend: 'up', score: 69, status: 'active', matchupDifficulty: 'Hard', isLocked: false },
+  { id: 110, name: 'Jonathan Taylor', position: 'RB', slot: 'RB1', team: 'IND', opponent: 'TEN', vegasProp: 60.0, teamTotal: 21, avgYards: 66, usage: 'High', trend: 'up', score: 72, status: 'active', matchupDifficulty: 'Medium', isLocked: false },
+  { id: 111, name: 'Josh Jacobs', position: 'RB', slot: 'RB1', team: 'LV', opponent: 'KC', vegasProp: 48.0, teamTotal: 17, avgYards: 53, usage: 'High', trend: 'neutral', score: 61, status: 'active', matchupDifficulty: 'Hard', isLocked: false },
+  { id: 112, name: 'Rachaad White', position: 'RB', slot: 'RB2', team: 'TB', opponent: 'ATL', vegasProp: 44.0, teamTotal: 22, avgYards: 49, usage: 'Medium', trend: 'up', score: 58, status: 'active', matchupDifficulty: 'Easy', isLocked: false },
+  { id: 113, name: 'David Montgomery', position: 'RB', slot: 'RB1', team: 'DET', opponent: 'GB', vegasProp: 58.0, teamTotal: 26, avgYards: 63, usage: 'High', trend: 'neutral', score: 67, status: 'active', matchupDifficulty: 'Medium', isLocked: false },
+  { id: 114, name: 'Zack Moss', position: 'RB', slot: 'RB2', team: 'CIN', opponent: 'BAL', vegasProp: 40.0, teamTotal: 24, avgYards: 44, usage: 'Medium', trend: 'down', score: 52, status: 'active', matchupDifficulty: 'Hard', isLocked: false },
+
+  // WRs
+  { id: 115, name: 'Davante Adams', position: 'WR', slot: 'WR1', team: 'LV', opponent: 'KC', vegasProp: 58.0, teamTotal: 17, avgYards: 65, usage: 'High', trend: 'neutral', score: 66, status: 'active', matchupDifficulty: 'Hard', isLocked: false },
+  { id: 116, name: 'Amon-Ra St. Brown', position: 'WR', slot: 'WR1', team: 'DET', opponent: 'GB', vegasProp: 67.0, teamTotal: 26, avgYards: 74, usage: 'High', trend: 'up', score: 78, status: 'active', matchupDifficulty: 'Medium', isLocked: false },
+  { id: 117, name: 'Puka Nacua', position: 'WR', slot: 'WR2', team: 'LAR', opponent: 'SF', vegasProp: 52.0, teamTotal: 20, avgYards: 58, usage: 'High', trend: 'up', score: 64, status: 'active', matchupDifficulty: 'Hard', isLocked: false },
+  { id: 118, name: 'Deebo Samuel', position: 'WR', slot: 'WR2', team: 'SF', opponent: 'LAR', vegasProp: 49.0, teamTotal: 24, avgYards: 55, usage: 'Medium', trend: 'neutral', score: 61, status: 'questionable', matchupDifficulty: 'Medium', isLocked: false },
+  { id: 119, name: 'Christian Kirk', position: 'WR', slot: 'WR2', team: 'JAX', opponent: 'HOU', vegasProp: 45.0, teamTotal: 19, avgYards: 50, usage: 'Medium', trend: 'down', score: 54, status: 'active', matchupDifficulty: 'Medium', isLocked: false },
+  { id: 120, name: 'Keenan Allen', position: 'WR', slot: 'WR1', team: 'LAC', opponent: 'DEN', vegasProp: 55.0, teamTotal: 22, avgYards: 61, usage: 'High', trend: 'neutral', score: 65, status: 'active', matchupDifficulty: 'Easy', isLocked: false },
+  { id: 121, name: 'Drake London', position: 'WR', slot: 'WR1', team: 'ATL', opponent: 'TB', vegasProp: 50.0, teamTotal: 21, avgYards: 56, usage: 'High', trend: 'up', score: 63, status: 'active', matchupDifficulty: 'Medium', isLocked: false },
+  { id: 122, name: 'Tank Dell', position: 'WR', slot: 'WR2', team: 'HOU', opponent: 'JAX', vegasProp: 48.0, teamTotal: 23, avgYards: 53, usage: 'Medium', trend: 'up', score: 61, status: 'active', matchupDifficulty: 'Easy', isLocked: false },
+
+  // TEs
+  { id: 123, name: 'Mark Andrews', position: 'TE', slot: 'TE', team: 'BAL', opponent: 'CIN', vegasProp: 48.0, teamTotal: 29, avgYards: 54, usage: 'High', trend: 'up', score: 72, status: 'active', matchupDifficulty: 'Medium', isLocked: false },
+  { id: 124, name: 'TJ Hockenson', position: 'TE', slot: 'TE', team: 'MIN', opponent: 'CHI', vegasProp: 46.0, teamTotal: 27, avgYards: 51, usage: 'High', trend: 'neutral', score: 68, status: 'questionable', matchupDifficulty: 'Easy', isLocked: false },
+  { id: 125, name: 'Dalton Kincaid', position: 'TE', slot: 'TE', team: 'BUF', opponent: 'NYJ', vegasProp: 38.0, teamTotal: 27, avgYards: 42, usage: 'Medium', trend: 'neutral', score: 58, status: 'active', matchupDifficulty: 'Easy', isLocked: false },
+  { id: 126, name: 'Cole Kmet', position: 'TE', slot: 'TE', team: 'CHI', opponent: 'MIN', vegasProp: 35.0, teamTotal: 18, avgYards: 39, usage: 'Medium', trend: 'down', score: 49, status: 'active', matchupDifficulty: 'Hard', isLocked: false },
+  { id: 127, name: 'Evan Engram', position: 'TE', slot: 'TE', team: 'JAX', opponent: 'HOU', vegasProp: 42.0, teamTotal: 19, avgYards: 47, usage: 'High', trend: 'neutral', score: 60, status: 'active', matchupDifficulty: 'Medium', isLocked: false },
+];
