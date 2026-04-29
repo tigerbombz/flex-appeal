@@ -1,32 +1,24 @@
 import { useState, useMemo } from 'react';
 import {
-  Box, Typography, TextField, MenuItem,
-  Select, InputLabel, FormControl, Button,
-  Autocomplete, Divider
+  Box,
+  Typography,
+  TextField,
+  MenuItem,
+  Select,
+  InputLabel,
+  FormControl,
+  Button,
+  Autocomplete,
+  Divider,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import PlayerCompareCard from '../components/PlayerCompareCard';
 import { mockRoster, nflPlayerPool } from '../data/mockData';
+import { calcAdjustedScore } from '../utils/scoring';
+import type { ScoringFormat } from '../utils/scoring';
 import type { Player } from '../types/index';
 
-type ScoringFormat = 'PPR' | 'Half' | 'Standard';
 type PositionFilter = 'ALL' | 'QB' | 'RB' | 'WR' | 'TE';
-
-const getAdjustedScore = (player: Player, format: ScoringFormat): number => {
-  let adjusted = player.score;
-  if (format === 'PPR') {
-    if (player.position === 'WR') adjusted += 4;
-    if (player.position === 'TE') adjusted += 3;
-    if (player.position === 'RB') adjusted += 2;
-  } else if (format === 'Half') {
-    if (player.position === 'WR') adjusted += 2;
-    if (player.position === 'TE') adjusted += 2;
-    if (player.position === 'RB') adjusted += 1;
-  }
-  if (player.matchupDifficulty === 'Easy') adjusted += 3;
-  if (player.matchupDifficulty === 'Hard') adjusted -= 3;
-  return Math.min(Math.round(adjusted), 99);
-};
 
 // Combine roster + NFL pool, deduplicate by id
 const allPlayers: Player[] = [
@@ -44,19 +36,21 @@ const PlayerCompare = () => {
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL');
   const [searchValue, setSearchValue] = useState<Player | null>(null);
 
-  const filteredPool = useMemo(() =>
-    allPlayers.filter((p) => {
-      if (positionFilter !== 'ALL' && p.position !== positionFilter) return false;
-      if (comparedPlayers.find((c) => c.id === p.id)) return false;
-      return true;
-    }),
+  const filteredPool = useMemo(
+    () =>
+      allPlayers.filter((p) => {
+        if (positionFilter !== 'ALL' && p.position !== positionFilter) return false;
+        if (comparedPlayers.find((c) => c.id === p.id)) return false;
+        return true;
+      }),
     [positionFilter, comparedPlayers]
   );
 
-  const sortedPlayers = useMemo(() =>
-    [...comparedPlayers].sort((a, b) =>
-      getAdjustedScore(b, scoringFormat) - getAdjustedScore(a, scoringFormat)
-    ),
+  const sortedPlayers = useMemo(
+    () =>
+      [...comparedPlayers].sort(
+        (a, b) => calcAdjustedScore(b, scoringFormat) - calcAdjustedScore(a, scoringFormat)
+      ),
     [comparedPlayers, scoringFormat]
   );
 
@@ -76,7 +70,7 @@ const PlayerCompare = () => {
 
   const handleToggleLock = (id: number) => {
     setComparedPlayers((prev) =>
-      prev.map((p) => p.id === id ? { ...p, isLocked: !p.isLocked } : p)
+      prev.map((p) => (p.id === id ? { ...p, isLocked: !p.isLocked } : p))
     );
   };
 
@@ -169,7 +163,15 @@ const PlayerCompare = () => {
           }}
         >
           <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#000', textTransform: 'uppercase', letterSpacing: 1 }}>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#000',
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+              }}
+            >
               Top Pick · {scoringFormat}
             </Typography>
             <Typography sx={{ fontSize: 20, fontWeight: 700, color: '#000' }}>
@@ -180,14 +182,14 @@ const PlayerCompare = () => {
             </Typography>
           </Box>
           <Typography sx={{ fontSize: 36, fontWeight: 700, color: '#000' }}>
-            {getAdjustedScore(topPlayer, scoringFormat)}
+            {calcAdjustedScore(topPlayer, scoringFormat)}
           </Typography>
         </Box>
       )}
 
       <Divider sx={{ mb: 2 }} />
 
-      {/* Player cards — sorted by score */}
+      {/* Player cards sorted by score */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {sortedPlayers.map((player, index) => (
           <PlayerCompareCard
@@ -203,7 +205,9 @@ const PlayerCompare = () => {
 
       {/* Max players notice */}
       {comparedPlayers.length >= 5 && (
-        <Typography sx={{ mt: 2, fontSize: 12, color: 'text.secondary', textAlign: 'center' }}>
+        <Typography
+          sx={{ mt: 2, fontSize: 12, color: 'text.secondary', textAlign: 'center' }}
+        >
           Maximum of 5 players reached — remove one to add another.
         </Typography>
       )}
