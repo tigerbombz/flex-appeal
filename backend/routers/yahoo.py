@@ -62,3 +62,11 @@ async def fetch_my_team(league_key: str):
         return { "team": team }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@router.get("/debug")
+async def debug_env():
+    return {
+        "redirect_uri":  os.getenv("YAHOO_REDIRECT_URI"),
+        "client_id_set": os.getenv("YAHOO_CLIENT_ID") is not None,
+        "secret_set":    os.getenv("YAHOO_CLIENT_SECRET") is not None,
+    }
