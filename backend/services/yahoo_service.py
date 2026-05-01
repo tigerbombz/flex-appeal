@@ -1,5 +1,6 @@
 import httpx
 import os
+import base64
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,6 +29,9 @@ def get_auth_url() -> str:
 
 async def exchange_code_for_token(code: str) -> dict:
     """Exchange the OAuth code for an access token"""
+    credentials = f"{YAHOO_CLIENT_ID}:{YAHOO_CLIENT_SECRET}"
+    encoded     = base64.b64encode(credentials.encode()).decode()
+
     async with httpx.AsyncClient() as client:
         response = await client.post(
             YAHOO_TOKEN_URL,
@@ -36,9 +40,15 @@ async def exchange_code_for_token(code: str) -> dict:
                 "code":         code,
                 "redirect_uri": YAHOO_REDIRECT_URI,
             },
-            auth=(YAHOO_CLIENT_ID, YAHOO_CLIENT_SECRET),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            headers={
+                "Authorization": f"Basic {encoded}",
+                "Content-Type":  "application/x-www-form-urlencoded",
+            },
         )
+
+        print(f"Token exchange status: {response.status_code}")
+        print(f"Token exchange response: {response.text}")
+
         response.raise_for_status()
         token_data = response.json()
         token_store["access_token"]  = token_data["access_token"]
@@ -52,6 +62,9 @@ async def refresh_access_token() -> dict:
     if not refresh_token:
         raise Exception("No refresh token available — user must re-authenticate")
 
+    credentials = f"{YAHOO_CLIENT_ID}:{YAHOO_CLIENT_SECRET}"
+    encoded     = base64.b64encode(credentials.encode()).decode()
+
     async with httpx.AsyncClient() as client:
         response = await client.post(
             YAHOO_TOKEN_URL,
@@ -60,8 +73,10 @@ async def refresh_access_token() -> dict:
                 "refresh_token": refresh_token,
                 "redirect_uri":  YAHOO_REDIRECT_URI,
             },
-            auth=(YAHOO_CLIENT_ID, YAHOO_CLIENT_SECRET),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            headers={
+                "Authorization": f"Basic {encoded}",
+                "Content-Type":  "application/x-www-form-urlencoded",
+            },
         )
         response.raise_for_status()
         token_data = response.json()
@@ -108,26 +123,26 @@ async def get_user_leagues() -> list:
 
     try:
         leagues = []
-        users = data["fantasy_content"]["users"]
-        user  = users["0"]["user"]
-        games = user[1]["games"]
+        users   = data["fantasy_content"]["users"]
+        user    = users["0"]["user"]
+        games   = user[1]["games"]
 
         game_count = int(games["count"])
         for i in range(game_count):
-            game = games[str(i)]["game"]
-            league_data = game[1]["leagues"]
+            game         = games[str(i)]["game"]
+            league_data  = game[1]["leagues"]
             league_count = int(league_data["count"])
 
             for j in range(league_count):
                 league = league_data[str(j)]["league"][0]
                 leagues.append({
-                    "league_key":    league.get("league_key"),
-                    "league_id":     league.get("league_id"),
-                    "name":          league.get("name"),
-                    "season":        league.get("season"),
-                    "num_teams":     league.get("num_teams"),
-                    "scoring_type":  league.get("scoring_type"),
-                    "current_week":  league.get("current_week"),
+                    "league_key":   league.get("league_key"),
+                    "league_id":    league.get("league_id"),
+                    "name":         league.get("name"),
+                    "season":       league.get("season"),
+                    "num_teams":    league.get("num_teams"),
+                    "scoring_type": league.get("scoring_type"),
+                    "current_week": league.get("current_week"),
                 })
 
         return leagues
@@ -141,25 +156,25 @@ async def get_roster(league_key: str, team_key: str) -> list:
     )
 
     try:
-        players  = []
-        roster   = data["fantasy_content"]["team"][1]["roster"]
+        players     = []
+        roster      = data["fantasy_content"]["team"][1]["roster"]
         player_list = roster["0"]["players"]
-        count    = int(player_list["count"])
+        count       = int(player_list["count"])
 
         for i in range(count):
-            player = player_list[str(i)]["player"][0]
+            player      = player_list[str(i)]["player"][0]
             player_info = {}
             for item in player:
                 if isinstance(item, dict):
                     player_info.update(item)
 
             players.append({
-                "player_key":        player_info.get("player_key"),
-                "name":              player_info.get("full_name"),
-                "position":          player_info.get("display_position"),
-                "team":              player_info.get("editorial_team_abbr", "").upper(),
-                "status":            player_info.get("status", "active"),
-                "injury_note":       player_info.get("injury_note"),
+                "player_key":  player_info.get("player_key"),
+                "name":        player_info.get("full_name"),
+                "position":    player_info.get("display_position"),
+                "team":        player_info.get("editorial_team_abbr", "").upper(),
+                "status":      player_info.get("status", "active"),
+                "injury_note": player_info.get("injury_note"),
             })
 
         return players
@@ -177,7 +192,7 @@ async def get_my_team(league_key: str) -> dict:
         team_count = int(teams["count"])
 
         for i in range(team_count):
-            team = teams[str(i)]["team"][0]
+            team      = teams[str(i)]["team"][0]
             team_info = {}
             for item in team:
                 if isinstance(item, dict):
@@ -185,11 +200,11 @@ async def get_my_team(league_key: str) -> dict:
 
             if team_info.get("is_owned_by_current_login"):
                 return {
-                    "team_key":  team_info.get("team_key"),
-                    "team_id":   team_info.get("team_id"),
-                    "name":      team_info.get("name"),
-                    "wins":      team_info.get("wins"),
-                    "losses":    team_info.get("losses"),
+                    "team_key": team_info.get("team_key"),
+                    "team_id":  team_info.get("team_id"),
+                    "name":     team_info.get("name"),
+                    "wins":     team_info.get("wins"),
+                    "losses":   team_info.get("losses"),
                 }
 
         raise Exception("Could not find user team in league")
