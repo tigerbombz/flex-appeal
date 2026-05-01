@@ -1,7 +1,7 @@
 import type { League, Player, Roster, LineupEvaluation, WeeklyMatchup, CurrentMatchup } from '../types';
 
 export const mockLeague: League = {
-  name: 'The Gridiron Gazette',
+  name: 'The Chau Slayer',
   scoringFormat: 'PPR',
   week: 14,
   record: '8-5',

@@ -44,4 +44,20 @@ export const scoringApi = {
   },
 };
 
+export const playerApi = {
+  searchPlayers: async (search?: string, position?: string, limit = 100) => {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (position && position !== 'ALL') params.append('position', position);
+    params.append('limit', limit.toString());
+    const res = await api.get(`/api/players/nfl?${params.toString()}`);
+    return res.data;
+  },
+
+  getPlayerById: async (playerId: string) => {
+    const res = await api.get(`/api/players/nfl/${playerId}`);
+    return res.data;
+  },
+};
+
 export default api;
