@@ -29,3 +29,14 @@ dist-ssr
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Backend secrets
+backend/.env
+
+# Python virtual environments
+.venv
+backend/venv/
+backend/.env
+backend/__pycache__/
+backend/**/__pycache__/
+*.pyc
