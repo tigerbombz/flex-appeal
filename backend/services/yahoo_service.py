@@ -18,9 +18,12 @@ token_store: dict = {}
 
 def get_auth_url() -> str:
     """Build the Yahoo OAuth authorization URL"""
+    client_id    = os.getenv("YAHOO_CLIENT_ID")
+    redirect_uri = os.getenv("YAHOO_REDIRECT_URI")
+
     params = {
-        "client_id":     YAHOO_CLIENT_ID,
-        "redirect_uri":  YAHOO_REDIRECT_URI,
+        "client_id":     client_id,
+        "redirect_uri":  redirect_uri,
         "response_type": "code",
         "language":      "en-us",
     }
@@ -29,7 +32,14 @@ def get_auth_url() -> str:
 
 async def exchange_code_for_token(code: str) -> dict:
     """Exchange the OAuth code for an access token"""
-    credentials = f"{YAHOO_CLIENT_ID}:{YAHOO_CLIENT_SECRET}"
+    client_id     = os.getenv("YAHOO_CLIENT_ID")
+    client_secret = os.getenv("YAHOO_CLIENT_SECRET")
+    redirect_uri  = os.getenv("YAHOO_REDIRECT_URI")
+
+    print(f"Using redirect_uri: {redirect_uri}")
+    print(f"Using client_id: {client_id[:10]}...")
+
+    credentials = f"{client_id}:{client_secret}"
     encoded     = base64.b64encode(credentials.encode()).decode()
 
     async with httpx.AsyncClient() as client:
@@ -38,7 +48,7 @@ async def exchange_code_for_token(code: str) -> dict:
             data={
                 "grant_type":   "authorization_code",
                 "code":         code,
-                "redirect_uri": YAHOO_REDIRECT_URI,
+                "redirect_uri": redirect_uri,
             },
             headers={
                 "Authorization": f"Basic {encoded}",
