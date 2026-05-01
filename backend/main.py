@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import odds, scoring, sleeper
+from routers import odds, scoring, sleeper, yahoo
 import os
 
 app = FastAPI(title="SnapDecision API", version="1.0.0")
 
-# Update CORS to allow both local dev and your future Vercel URL
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
@@ -23,6 +22,7 @@ app.add_middleware(
 app.include_router(odds.router)
 app.include_router(scoring.router)
 app.include_router(sleeper.router)
+app.include_router(yahoo.router)
 
 @app.get("/")
 def root():

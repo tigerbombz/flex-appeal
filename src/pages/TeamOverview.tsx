@@ -1,10 +1,26 @@
-import { Box, Typography, Button, Divider, Skeleton, Alert } from '@mui/material';
+import { useState } from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  Divider,
+  Skeleton,
+  Alert,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+} from '@mui/material';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import LinkIcon from '@mui/icons-material/Link';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PlayerCard from '../components/PlayerCard';
 import FreshnessBadge from '../components/FreshnessBadge';
 import { mockLeague, mockRoster, mockCurrentMatchup } from '../data/mockData';
 import { useNflEvents } from '../hooks/useOdds';
+import { useYahooStatus, useYahooLeagues } from '../hooks/useYahoo';
+import { yahooApi } from '../services/api';
 
 interface Props {
   onNavigate: (tab: number) => void;
@@ -12,6 +28,9 @@ interface Props {
 
 const TeamOverview = ({ onNavigate }: Props) => {
   const { events, loading, error, lastUpdated } = useNflEvents();
+  const { connected, loading: yahooLoading } = useYahooStatus();
+  const { leagues, loading: leaguesLoading, error: leaguesError } = useYahooLeagues(connected);
+  const [selectedLeague, setSelectedLeague] = useState<string>('');
 
   return (
     <Box sx={{ p: 2 }}>
@@ -28,6 +47,101 @@ const TeamOverview = ({ onNavigate }: Props) => {
         </Box>
         <FreshnessBadge lastUpdated={lastUpdated} loading={loading} />
       </Box>
+
+      {/* Yahoo connect banner */}
+      {!yahooLoading && !connected && (
+        <Box
+          sx={{
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 3,
+            px: 2,
+            py: 2,
+            mb: 2,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <Box>
+            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+              Connect Yahoo Fantasy
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5 }}>
+              Pull your real roster and league settings
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<LinkIcon />}
+            onClick={() => window.location.href = yahooApi.connectUrl()}
+            sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}
+          >
+            Connect Yahoo
+          </Button>
+        </Box>
+      )}
+
+      {/* Yahoo connected banner */}
+      {connected && (
+        <Box
+          sx={{
+            bgcolor: '#22c55e15',
+            border: '1px solid #22c55e40',
+            borderRadius: 3,
+            px: 2,
+            py: 1.5,
+            mb: 2,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 18 }} />
+            <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#22c55e' }}>
+              Yahoo Connected
+            </Typography>
+          </Box>
+
+          {leaguesLoading && (
+            <Skeleton variant="rounded" width={160} height={36} />
+          )}
+
+          {leaguesError && (
+            <Alert severity="error" sx={{ fontSize: 12, py: 0 }}>
+              {leaguesError}
+            </Alert>
+          )}
+
+          {!leaguesLoading && leagues.length > 0 && (
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel>Select League</InputLabel>
+              <Select
+                value={selectedLeague}
+                label="Select League"
+                onChange={(e) => setSelectedLeague(e.target.value)}
+              >
+                {leagues.map((league) => (
+                  <MenuItem key={league.league_key} value={league.league_key}>
+                    {league.name} ({league.season})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
+          {!leaguesLoading && leagues.length === 0 && !leaguesError && (
+            <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+              No active leagues found for this season
+            </Typography>
+          )}
+        </Box>
+      )}
 
       {/* Current matchup banner */}
       <Box
