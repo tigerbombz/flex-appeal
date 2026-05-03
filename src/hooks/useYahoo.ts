@@ -94,11 +94,9 @@ export const useYahooLeagues = (connected: boolean, sessionExpired: boolean) => 
         const data = await yahooApi.getLeagues();
         setLeagues(data.leagues);
       } catch (err: any) {
-        if (err?.response?.status === 401) {
-          setError('session_expired');
-        } else {
-          setError('Failed to fetch leagues');
-        }
+        // Don't treat this as session expired
+        // Could be offseason with no leagues
+        setError('offseason');
         console.error(err);
       } finally {
         setLoading(false);

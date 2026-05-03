@@ -149,9 +149,16 @@ const TeamOverview = ({ onNavigate }: Props) => {
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 18 }} />
-            <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#22c55e' }}>
-              Yahoo Connected
-            </Typography>
+            <Box>
+              <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#22c55e' }}>
+                Yahoo Connected
+              </Typography>
+              {leaguesError === 'offseason' && (
+                <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
+                  No active leagues yet — check back when the season starts
+                </Typography>
+              )}
+            </Box>
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -174,12 +181,6 @@ const TeamOverview = ({ onNavigate }: Props) => {
                   ))}
                 </Select>
               </FormControl>
-            )}
-
-            {!leaguesLoading && leagues.length === 0 && !leaguesError && (
-              <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                No active leagues found
-              </Typography>
             )}
 
             <Button
