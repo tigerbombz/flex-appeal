@@ -28,7 +28,7 @@ interface Props {
 
 const TeamOverview = ({ onNavigate }: Props) => {
   const { events, loading, error, lastUpdated } = useNflEvents();
-  const { connected, loading: yahooLoading } = useYahooStatus();
+  const { connected, loading: yahooLoading, disconnect } = useYahooStatus();
   const { leagues, loading: leaguesLoading, error: leaguesError } = useYahooLeagues(connected);
   const [selectedLeague, setSelectedLeague] = useState<string>('');
 
@@ -140,6 +140,14 @@ const TeamOverview = ({ onNavigate }: Props) => {
               No active leagues found for this season
             </Typography>
           )}
+
+          <Button
+            size="small"
+            onClick={disconnect}
+            sx={{ fontSize: 11, color: 'text.secondary' }}
+          >
+            Disconnect
+          </Button>
         </Box>
       )}
 
