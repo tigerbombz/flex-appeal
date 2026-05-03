@@ -14,32 +14,50 @@ export interface YahooLeague {
 export const useYahooStatus = () => {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
     const check = async () => {
       try {
-        // Check if returning from Yahoo OAuth callback
         const params = new URLSearchParams(window.location.search);
-        if (params.get('yahoo_connected') === 'true') {
-          localStorage.setItem('yahoo_connected', 'true');
+
+        const yahooError = params.get('yahoo_error');
+        if (yahooError) {
+          console.error('Yahoo OAuth error:', yahooError);
           window.history.replaceState({}, '', window.location.pathname);
+          setLoading(false);
+          return;
         }
 
-        // Check localStorage first for persisted state
-        const localConnected = localStorage.getItem('yahoo_connected') === 'true';
+        if (params.get('yahoo_connected') === 'true') {
+          localStorage.setItem('yahoo_connected', 'true');
+          localStorage.removeItem('yahoo_session_expired');
+          window.history.replaceState({}, '', window.location.pathname);
+          setConnected(true);
+          setSessionExpired(false);
+          setLoading(false);
+          return;
+        }
 
+        const localConnected = localStorage.getItem('yahoo_connected') === 'true';
         if (localConnected) {
-          // Verify token is still valid on backend
-          const data = await yahooApi.getStatus();
-          if (data.connected) {
+          try {
+            const data = await yahooApi.getStatus();
+            if (data.connected) {
+              setConnected(true);
+              setSessionExpired(false);
+            } else {
+              // Backend lost token — show session expired
+              setConnected(true);
+              setSessionExpired(true);
+            }
+          } catch {
             setConnected(true);
-          } else {
-            // Token expired — clear local state
-            localStorage.removeItem('yahoo_connected');
-            setConnected(false);
+            setSessionExpired(true);
           }
         } else {
           setConnected(false);
+          setSessionExpired(false);
         }
       } catch {
         setConnected(false);
@@ -53,27 +71,34 @@ export const useYahooStatus = () => {
 
   const disconnect = () => {
     localStorage.removeItem('yahoo_connected');
+    localStorage.removeItem('yahoo_session_expired');
     setConnected(false);
+    setSessionExpired(false);
   };
 
-  return { connected, loading, disconnect };
+  return { connected, loading, sessionExpired, disconnect };
 };
 
-export const useYahooLeagues = (connected: boolean) => {
+export const useYahooLeagues = (connected: boolean, sessionExpired: boolean) => {
   const [leagues, setLeagues] = useState<YahooLeague[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!connected) return;
+    if (!connected || sessionExpired) return;
 
     const fetch = async () => {
       try {
         setLoading(true);
+        setError(null);
         const data = await yahooApi.getLeagues();
         setLeagues(data.leagues);
-      } catch (err) {
-        setError('Failed to fetch leagues');
+      } catch (err: any) {
+        if (err?.response?.status === 401) {
+          setError('session_expired');
+        } else {
+          setError('Failed to fetch leagues');
+        }
         console.error(err);
       } finally {
         setLoading(false);
@@ -81,7 +106,7 @@ export const useYahooLeagues = (connected: boolean) => {
     };
 
     fetch();
-  }, [connected]);
+  }, [connected, sessionExpired]);
 
   return { leagues, loading, error };
 };

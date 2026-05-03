@@ -25,10 +25,13 @@ async def yahoo_callback(code: str):
     """Handle Yahoo OAuth callback and exchange code for token"""
     try:
         await exchange_code_for_token(code)
-        # Redirect back to frontend after successful auth
-        return RedirectResponse(url=f"{FRONTEND_URL}?yahoo_connected=true")
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        print(f"Redirecting to: {frontend_url}?yahoo_connected=true")
+        return RedirectResponse(url=f"{frontend_url}?yahoo_connected=true")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"Callback error: {str(e)}")
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        return RedirectResponse(url=f"{frontend_url}?yahoo_error={str(e)}")
 
 @router.get("/status")
 async def yahoo_status():

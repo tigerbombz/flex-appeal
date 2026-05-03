@@ -15,6 +15,7 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import LinkIcon from '@mui/icons-material/Link';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import PlayerCard from '../components/PlayerCard';
 import FreshnessBadge from '../components/FreshnessBadge';
 import { mockLeague, mockRoster, mockCurrentMatchup } from '../data/mockData';
@@ -28,8 +29,8 @@ interface Props {
 
 const TeamOverview = ({ onNavigate }: Props) => {
   const { events, loading, error, lastUpdated } = useNflEvents();
-  const { connected, loading: yahooLoading, disconnect } = useYahooStatus();
-  const { leagues, loading: leaguesLoading, error: leaguesError } = useYahooLeagues(connected);
+  const { connected, loading: yahooLoading, sessionExpired, disconnect } = useYahooStatus();
+  const { leagues, loading: leaguesLoading, error: leaguesError } = useYahooLeagues(connected, sessionExpired);
   const [selectedLeague, setSelectedLeague] = useState<string>('');
 
   return (
@@ -48,7 +49,7 @@ const TeamOverview = ({ onNavigate }: Props) => {
         <FreshnessBadge lastUpdated={lastUpdated} loading={loading} />
       </Box>
 
-      {/* Yahoo connect banner */}
+      {/* Yahoo not connected */}
       {!yahooLoading && !connected && (
         <Box
           sx={{
@@ -84,8 +85,53 @@ const TeamOverview = ({ onNavigate }: Props) => {
         </Box>
       )}
 
-      {/* Yahoo connected banner */}
-      {connected && (
+      {/* Yahoo session expired */}
+      {connected && sessionExpired && (
+        <Box
+          sx={{
+            bgcolor: '#eab30815',
+            border: '1px solid #eab30840',
+            borderRadius: 3,
+            px: 2,
+            py: 1.5,
+            mb: 2,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 1,
+          }}
+        >
+          <Box>
+            <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#eab308' }}>
+              Yahoo Session Expired
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5 }}>
+              Your session expired — click to reconnect
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={() => window.location.href = yahooApi.connectUrl()}
+              sx={{ fontWeight: 600, whiteSpace: 'nowrap', bgcolor: '#eab308', '&:hover': { bgcolor: '#ca9d07' } }}
+            >
+              Reconnect
+            </Button>
+            <Button
+              size="small"
+              onClick={disconnect}
+              sx={{ fontSize: 11, color: 'text.secondary' }}
+            >
+              Disconnect
+            </Button>
+          </Box>
+        </Box>
+      )}
+
+      {/* Yahoo connected */}
+      {connected && !sessionExpired && (
         <Box
           sx={{
             bgcolor: '#22c55e15',
@@ -108,46 +154,42 @@ const TeamOverview = ({ onNavigate }: Props) => {
             </Typography>
           </Box>
 
-          {leaguesLoading && (
-            <Skeleton variant="rounded" width={160} height={36} />
-          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {leaguesLoading && (
+              <Skeleton variant="rounded" width={160} height={36} />
+            )}
 
-          {leaguesError && (
-            <Alert severity="error" sx={{ fontSize: 12, py: 0 }}>
-              {leaguesError}
-            </Alert>
-          )}
+            {!leaguesLoading && leagues.length > 0 && (
+              <FormControl size="small" sx={{ minWidth: 160 }}>
+                <InputLabel>Select League</InputLabel>
+                <Select
+                  value={selectedLeague}
+                  label="Select League"
+                  onChange={(e) => setSelectedLeague(e.target.value)}
+                >
+                  {leagues.map((league) => (
+                    <MenuItem key={league.league_key} value={league.league_key}>
+                      {league.name} ({league.season})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
 
-          {!leaguesLoading && leagues.length > 0 && (
-            <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel>Select League</InputLabel>
-              <Select
-                value={selectedLeague}
-                label="Select League"
-                onChange={(e) => setSelectedLeague(e.target.value)}
-              >
-                {leagues.map((league) => (
-                  <MenuItem key={league.league_key} value={league.league_key}>
-                    {league.name} ({league.season})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
+            {!leaguesLoading && leagues.length === 0 && !leaguesError && (
+              <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                No active leagues found
+              </Typography>
+            )}
 
-          {!leaguesLoading && leagues.length === 0 && !leaguesError && (
-            <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-              No active leagues found for this season
-            </Typography>
-          )}
-
-          <Button
-            size="small"
-            onClick={disconnect}
-            sx={{ fontSize: 11, color: 'text.secondary' }}
-          >
-            Disconnect
-          </Button>
+            <Button
+              size="small"
+              onClick={disconnect}
+              sx={{ fontSize: 11, color: 'text.secondary' }}
+            >
+              Disconnect
+            </Button>
+          </Box>
         </Box>
       )}
 
@@ -236,7 +278,7 @@ const TeamOverview = ({ onNavigate }: Props) => {
 
       <Divider sx={{ mb: 3 }} />
 
-      {/* Live NFL Games from Odds API */}
+      {/* Upcoming NFL Games */}
       <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1 }}>
         Upcoming NFL Games
       </Typography>
@@ -284,10 +326,10 @@ const TeamOverview = ({ onNavigate }: Props) => {
             <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
               {new Date(event.commence_time).toLocaleDateString([], {
                 weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
+                month:   'short',
+                day:     'numeric',
+                hour:    '2-digit',
+                minute:  '2-digit',
               })}
             </Typography>
           </Box>
