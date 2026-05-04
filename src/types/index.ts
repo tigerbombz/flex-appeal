@@ -7,6 +7,7 @@ export interface Player {
   opponent: string;
   vegasProp: number | null;
   teamTotal: number | null;
+  oppTotal: number | null;
   avgYards: number | null;
   usage: 'High' | 'Medium' | 'Low' | null;
   trend: 'up' | 'neutral' | 'down';
@@ -14,6 +15,15 @@ export interface Player {
   status: 'active' | 'questionable' | 'out';
   matchupDifficulty: 'Easy' | 'Medium' | 'Hard';
   isLocked: boolean;
+  oppRank: number | null;
+  oppPointsAllowed: number | null;
+  snapPct: number | null;
+  targetShare: number | null;
+  carryShare: number | null;
+  volatility: 'Low' | 'Medium' | 'High';
+  isDome: boolean;
+  weather: 'Clear' | 'Wind' | 'Rain' | 'Snow' | null;
+  pointsLastThree: number[];
 }
 
 export interface League {
@@ -54,15 +64,4 @@ export interface CurrentMatchup {
   opponentRecord: string;
   opponentProjected: number;
   myProjected: number;
-}
-
-export interface LeagueSettings {
-  scoringFormat: 'PPR' | 'Half' | 'Standard';
-  flexPositions: ('RB' | 'WR' | 'TE')[];
-  rosterSlots: string[];
-}
-
-export interface PlayerWithMatchup extends Player {
-  matchupDifficulty: 'Easy' | 'Medium' | 'Hard';
-  isLocked: boolean;
 }
