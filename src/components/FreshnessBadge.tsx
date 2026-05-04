@@ -7,9 +7,14 @@ interface Props {
 
 const FreshnessBadge = ({ lastUpdated, loading }: Props) => {
   const formatTime = (iso: string) => {
-    const date = new Date(iso);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const date = new Date(iso);
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+};
 
   return (
     <Box
