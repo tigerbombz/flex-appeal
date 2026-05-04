@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import odds, scoring, sleeper, yahoo
+from routers import odds, scoring, sleeper, yahoo, lineup
 import os
 
 app = FastAPI(title="SnapDecision API", version="1.0.0")
@@ -23,6 +23,8 @@ app.include_router(odds.router)
 app.include_router(scoring.router)
 app.include_router(sleeper.router)
 app.include_router(yahoo.router)
+app.include_router(lineup.router)
+
 
 @app.get("/")
 def root():
