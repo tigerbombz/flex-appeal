@@ -21,8 +21,10 @@ import { usePlayers, toPlayer } from '../hooks/usePlayers';
 import type { ScoringFormat } from '../utils/scoring';
 import type { Player } from '../types/index';
 import type { SleeperPlayer } from '../hooks/usePlayers';
+import ModeSelector from '../components/ModeSelector';
+import type { ScoringMode } from '../hooks/useScoring';
 
-type PositionFilter = 'ALL' | 'QB' | 'RB' | 'WR' | 'TE';
+type PositionFilter = 'ALL' | 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DST';
 
 const PlayerCompare = () => {
   const [comparedPlayers, setComparedPlayers] = useState<Player[]>([
@@ -32,15 +34,17 @@ const PlayerCompare = () => {
   const [scoringFormat, setScoringFormat] = useState<ScoringFormat>('PPR');
   const [positionFilter, setPositionFilter] = useState<PositionFilter>('ALL');
   const [searchValue, setSearchValue] = useState<SleeperPlayer | null>(null);
+  const [scoringMode, setScoringMode] = useState<ScoringMode>('balanced');
 
   // Live player search from Sleeper via backend
   const { results, loading: searchLoading, search, clearResults } = usePlayers();
 
   // Backend scoring hook
   const { scoredPlayers, loading: scoreLoading, error, topPick } = useScoring(
-    comparedPlayers,
-    scoringFormat
-  );
+  comparedPlayers,
+  scoringFormat,
+  scoringMode
+);
 
   // Sort by backend adjusted score, fall back to mock score
   const sortedPlayers = useMemo(() => {
@@ -93,7 +97,7 @@ const PlayerCompare = () => {
       )}
 
       {/* Settings row */}
-      <Box sx={{ display: 'flex', gap: 1.5, mb: 2 }}>
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <FormControl size="small" sx={{ minWidth: 110 }}>
           <InputLabel>Format</InputLabel>
           <Select
@@ -119,8 +123,12 @@ const PlayerCompare = () => {
             <MenuItem value="RB">RB</MenuItem>
             <MenuItem value="WR">WR</MenuItem>
             <MenuItem value="TE">TE</MenuItem>
+            <MenuItem value="K">K</MenuItem>
+            <MenuItem value="DST">D/ST</MenuItem>
           </Select>
         </FormControl>
+
+        <ModeSelector mode={scoringMode} onChange={setScoringMode} />
       </Box>
 
       {/* Search + add */}

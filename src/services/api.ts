@@ -29,12 +29,29 @@ export const oddsApi = {
 };
 
 export const scoringApi = {
-  scorePlayers: async (players: Player[], scoringFormat: ScoringFormat) => {
-    const res = await api.post('/api/scoring/score', { players, scoringFormat });
+  scorePlayers: async (
+    players: Player[],
+    scoringFormat: ScoringFormat,
+    scoringMode: string = 'balanced'
+  ) => {
+    const res = await api.post('/api/scoring/score', {
+      players,
+      scoringFormat,
+      scoringMode,
+    });
     return res.data;
   },
-  explainPlayer: async (playerId: number, players: Player[], scoringFormat: ScoringFormat) => {
-    const res = await api.post(`/api/scoring/explain/${playerId}`, { players, scoringFormat });
+  explainPlayer: async (
+    playerId: number,
+    players: Player[],
+    scoringFormat: ScoringFormat,
+    scoringMode: string = 'balanced'
+  ) => {
+    const res = await api.post(`/api/scoring/explain/${playerId}`, {
+      players,
+      scoringFormat,
+      scoringMode,
+    });
     return res.data;
   },
 };
@@ -50,6 +67,35 @@ export const playerApi = {
   },
   getPlayerById: async (playerId: string) => {
     const res = await api.get(`/api/players/nfl/${playerId}`);
+    return res.data;
+  },
+};
+
+export const lineupApi = {
+  evaluate: async (
+    starters: Player[],
+    bench: Player[],
+    scoringFormat: ScoringFormat,
+    scoringMode: string = 'balanced'
+  ) => {
+    const res = await api.post('/api/lineup/evaluate', {
+      starters,
+      bench,
+      scoringFormat,
+      scoringMode,
+    });
+    return res.data;
+  },
+  evaluateFlex: async (
+    candidates: Player[],
+    scoringFormat: ScoringFormat,
+    scoringMode: string = 'balanced'
+  ) => {
+    const res = await api.post('/api/lineup/flex', {
+      candidates,
+      scoringFormat,
+      scoringMode,
+    });
     return res.data;
   },
 };

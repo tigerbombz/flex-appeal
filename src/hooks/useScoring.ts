@@ -3,6 +3,8 @@ import { scoringApi } from '../services/api';
 import type { Player } from '../types/index';
 import type { ScoringFormat } from '../utils/scoring';
 
+export type ScoringMode = 'balanced' | 'floor' | 'upside';
+
 export interface ScoredPlayer {
   id: number;
   name: string;
@@ -14,9 +16,17 @@ export interface ScoredPlayer {
   scoreLabel: string;
   scoreColor: string;
   explanation: string;
+  volatility: 'Low' | 'Medium' | 'High';
+  volatilityColor: string;
+  floor: number;
+  ceiling: number;
 }
 
-export const useScoring = (players: Player[], scoringFormat: ScoringFormat) => {
+export const useScoring = (
+  players: Player[],
+  scoringFormat: ScoringFormat,
+  scoringMode: ScoringMode = 'balanced'
+) => {
   const [scoredPlayers, setScoredPlayers] = useState<ScoredPlayer[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +39,7 @@ export const useScoring = (players: Player[], scoringFormat: ScoringFormat) => {
       try {
         setLoading(true);
         setError(null);
-        const data = await scoringApi.scorePlayers(players, scoringFormat);
+        const data = await scoringApi.scorePlayers(players, scoringFormat, scoringMode);
         setScoredPlayers(data.players);
         setTopPick(data.topPick);
       } catch (err) {
@@ -41,7 +51,7 @@ export const useScoring = (players: Player[], scoringFormat: ScoringFormat) => {
     };
 
     fetchScores();
-  }, [players, scoringFormat]);
+  }, [players, scoringFormat, scoringMode]);
 
   return { scoredPlayers, loading, error, topPick };
 };
