@@ -2,7 +2,6 @@ import type {
   League,
   Player,
   Roster,
-  LineupEvaluation,
   WeeklyMatchup,
   CurrentMatchup,
 } from '../types';
