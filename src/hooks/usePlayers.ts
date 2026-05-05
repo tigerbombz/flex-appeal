@@ -20,7 +20,6 @@ export interface SleeperPlayer {
   isLocked: boolean;
 }
 
-// Convert Sleeper player to our Player interface shape
 export const toPlayer = (p: SleeperPlayer): Player => ({
   id:               parseInt(p.id) || Math.floor(Math.random() * 100000),
   name:             p.name,
@@ -55,7 +54,13 @@ export const usePlayers = () => {
   const [error, setError] = useState<string | null>(null);
 
   const search = useCallback(async (query: string, position?: string) => {
-    if (!query || query.length < 2) {
+    // Don't search for DST — handled by static pool
+    if (position === 'DST') {
+      setResults([]);
+      return;
+    }
+
+    if (!query || query.length < 1) {
       setResults([]);
       return;
     }
@@ -63,7 +68,7 @@ export const usePlayers = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await playerApi.searchPlayers(query, position, 20);
+      const data = await playerApi.searchPlayers(query, position, 30);
       setResults(data.players);
     } catch (err) {
       setError('Failed to search players');
