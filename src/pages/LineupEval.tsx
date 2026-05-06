@@ -1,27 +1,15 @@
-import { useState } from 'react';
-import {
-  Box,
-  Typography,
-  Chip,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  CircularProgress,
-  Alert,
-} from '@mui/material';
+import { Box, Typography, Chip, FormControl, InputLabel, Select, MenuItem, CircularProgress, Alert } from '@mui/material';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
 import EvalCard from '../components/EvalCard';
 import ModeSelector from '../components/ModeSelector';
 import { mockRoster, mockLeague } from '../data/mockData';
 import { useLineup } from '../hooks/useLineup';
+import { useSettings } from '../context/SettingsContext';
 import type { ScoringFormat } from '../utils/scoring';
-import type { ScoringMode } from '../hooks/useScoring';
 
 const LineupEval = () => {
-  const [scoringFormat, setScoringFormat] = useState<ScoringFormat>('PPR');
-  const [scoringMode, setScoringMode] = useState<ScoringMode>('balanced');
+  const { scoringFormat, scoringMode, setScoringFormat, setScoringMode } = useSettings();
 
   const { result, loading, error } = useLineup(
     mockRoster.starters,
@@ -57,7 +45,6 @@ const LineupEval = () => {
             <MenuItem value="Standard">Standard</MenuItem>
           </Select>
         </FormControl>
-
         <ModeSelector mode={scoringMode} onChange={setScoringMode} />
       </Box>
 
@@ -74,9 +61,9 @@ const LineupEval = () => {
         }}
       >
         <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-          {scoringMode === 'floor' && '🛡 Floor mode — prioritizes safe, consistent players. Best for must-win weeks or when protecting a lead.'}
+          {scoringMode === 'floor'    && '🛡 Floor mode — prioritizes safe, consistent players. Best for must-win weeks or when protecting a lead.'}
           {scoringMode === 'balanced' && '⚖️ Balanced mode — weighs all factors equally. Best for most situations.'}
-          {scoringMode === 'upside' && '🚀 Upside mode — targets boom potential. Best for must-win when you need a big week.'}
+          {scoringMode === 'upside'   && '🚀 Upside mode — targets boom potential. Best for must-win when you need a big week.'}
         </Typography>
       </Box>
 
@@ -100,7 +87,6 @@ const LineupEval = () => {
       {/* Results */}
       {!loading && result && (
         <>
-          {/* Summary */}
           <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
             <Chip
               size="small"
@@ -126,29 +112,15 @@ const LineupEval = () => {
                 '& .MuiChip-icon': { color: '#22c55e' },
               }}
             />
-            <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
-              {result.summary}
-            </Typography>
           </Box>
 
-          {/* Eval cards */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {result.evaluations.map((evaluation, index) => (
               <EvalCard key={index} evaluation={evaluation} />
             ))}
           </Box>
 
-          {/* Disclaimer */}
-          <Typography
-            sx={{
-              mt: 3,
-              fontSize: 12,
-              color: 'text.secondary',
-              textAlign: 'center',
-              lineHeight: 1.6,
-              px: 2,
-            }}
-          >
+          <Typography sx={{ mt: 3, fontSize: 12, color: 'text.secondary', textAlign: 'center', lineHeight: 1.6, px: 2 }}>
             Position-specific weights · Vegas props · Team totals · Usage · Trend · Matchup.
             Always apply your own judgment — this is a decision aid, not gospel.
           </Typography>

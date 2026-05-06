@@ -1,6 +1,7 @@
 import { Box, Typography, IconButton, Chip } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SportsFootballIcon from '@mui/icons-material/SportsFootball';
+import { useSettings } from '../context/SettingsContext';
 import { mockLeague } from '../data/mockData';
 
 interface Props {
@@ -8,6 +9,8 @@ interface Props {
 }
 
 const AppHeader = ({ onSettingsClick }: Props) => {
+  const { scoringFormat } = useSettings();
+
   return (
     <Box
       sx={{
@@ -68,7 +71,7 @@ const AppHeader = ({ onSettingsClick }: Props) => {
           }}
         />
         <Chip
-          label={mockLeague.scoringFormat}
+          label={scoringFormat}
           size="small"
           sx={{
             fontSize: 11,

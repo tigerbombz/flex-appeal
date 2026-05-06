@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -20,32 +20,21 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import { useYahooStatus, useYahooLeagues } from '../hooks/useYahoo';
 import { yahooApi } from '../services/api';
 import ModeSelector from '../components/ModeSelector';
+import { useSettings } from '../context/SettingsContext';
 import type { ScoringFormat } from '../utils/scoring';
-import type { ScoringMode } from '../hooks/useScoring';
-
-const SCORING_FORMAT_KEY  = 'snapdecision_scoring_format';
-const SCORING_MODE_KEY    = 'snapdecision_scoring_mode';
-const NOTIFICATIONS_KEY   = 'snapdecision_notifications';
 
 const Settings = () => {
-  const [scoringFormat, setScoringFormat]   = useState<ScoringFormat>(
-    (localStorage.getItem(SCORING_FORMAT_KEY) as ScoringFormat) || 'PPR'
+  const { scoringFormat, scoringMode, setScoringFormat, setScoringMode } = useSettings();
+  const [notifications, setNotifications] = useState(
+    localStorage.getItem('snapdecision_notifications') === 'true'
   );
-  const [scoringMode, setScoringMode]       = useState<ScoringMode>(
-    (localStorage.getItem(SCORING_MODE_KEY) as ScoringMode) || 'balanced'
-  );
-  const [notifications, setNotifications]   = useState(
-    localStorage.getItem(NOTIFICATIONS_KEY) === 'true'
-  );
-  const [saved, setSaved]                   = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const { connected, loading: yahooLoading, sessionExpired, disconnect } = useYahooStatus();
   const { leagues } = useYahooLeagues(connected, sessionExpired);
 
   const handleSave = () => {
-    localStorage.setItem(SCORING_FORMAT_KEY, scoringFormat);
-    localStorage.setItem(SCORING_MODE_KEY, scoringMode);
-    localStorage.setItem(NOTIFICATIONS_KEY, String(notifications));
+    localStorage.setItem('snapdecision_notifications', String(notifications));
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -229,7 +218,6 @@ const Settings = () => {
           gap: 2.5,
         }}
       >
-        {/* Scoring format */}
         <Box>
           <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>
             Scoring Format
@@ -237,7 +225,7 @@ const Settings = () => {
           <Typography sx={{ fontSize: 12, color: 'text.secondary', mb: 1 }}>
             Applied globally across all pages
           </Typography>
-          <FormControl size="small" sx={{ minWidth: 160 }}>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>Format</InputLabel>
             <Select
               value={scoringFormat}
@@ -253,7 +241,6 @@ const Settings = () => {
 
         <Divider />
 
-        {/* Scoring mode */}
         <Box>
           <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>
             Default Scoring Mode
@@ -263,9 +250,9 @@ const Settings = () => {
           </Typography>
           <ModeSelector mode={scoringMode} onChange={setScoringMode} />
           <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 1 }}>
-            {scoringMode === 'floor' && '🛡 Prioritizes safe, consistent players'}
+            {scoringMode === 'floor'    && '🛡 Prioritizes safe, consistent players'}
             {scoringMode === 'balanced' && '⚖️ Weighs all factors equally'}
-            {scoringMode === 'upside' && '🚀 Targets boom potential over floor'}
+            {scoringMode === 'upside'   && '🚀 Targets boom potential over floor'}
           </Typography>
         </Box>
       </Box>
@@ -311,7 +298,7 @@ const Settings = () => {
 
       <Divider sx={{ mb: 3 }} />
 
-      {/* App info */}
+      {/* About */}
       <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
         About
       </Typography>
@@ -358,7 +345,7 @@ const Settings = () => {
       </Button>
 
       <Typography sx={{ fontSize: 11, color: 'text.secondary', textAlign: 'center', mt: 1.5 }}>
-        Settings are saved locally and applied across all pages
+        Format and mode changes apply instantly across all pages
       </Typography>
 
     </Box>
