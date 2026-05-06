@@ -2,10 +2,11 @@ import httpx
 import os
 import base64
 from dotenv import load_dotenv
+from typing import Optional
 
 load_dotenv()
 
-YAHOO_CLIENT_ID     = os.getenv("YAHOO_CLIENT_ID")
+YAHOO_CLIENT_ID    = os.getenv("YAHOO_CLIENT_ID")
 YAHOO_CLIENT_SECRET = os.getenv("YAHOO_CLIENT_SECRET")
 YAHOO_REDIRECT_URI  = os.getenv("YAHOO_REDIRECT_URI")
 
@@ -13,14 +14,10 @@ YAHOO_AUTH_URL  = "https://api.login.yahoo.com/oauth2/request_auth"
 YAHOO_TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
 YAHOO_API_URL   = "https://fantasysports.yahooapis.com/fantasy/v2"
 
-# In-memory token store — will move to a database later
-token_store: dict = {}
-
 def get_auth_url() -> str:
-    """Build the Yahoo OAuth authorization URL"""
+    """Build Yahoo OAuth authorization URL"""
     client_id    = os.getenv("YAHOO_CLIENT_ID")
     redirect_uri = os.getenv("YAHOO_REDIRECT_URI")
-
     params = {
         "client_id":     client_id,
         "redirect_uri":  redirect_uri,
@@ -30,14 +27,11 @@ def get_auth_url() -> str:
     query = "&".join([f"{k}={v}" for k, v in params.items()])
     return f"{YAHOO_AUTH_URL}?{query}"
 
-async def exchange_code_for_token(code: str) -> dict:
-    """Exchange the OAuth code for an access token"""
+async def exchange_code_for_token(code: str, db=None) -> dict:
+    """Exchange OAuth code for access token and save to database"""
     client_id     = os.getenv("YAHOO_CLIENT_ID")
     client_secret = os.getenv("YAHOO_CLIENT_SECRET")
     redirect_uri  = os.getenv("YAHOO_REDIRECT_URI")
-
-    print(f"Using redirect_uri: {redirect_uri}")
-    print(f"Using client_id: {client_id[:10]}...")
 
     credentials = f"{client_id}:{client_secret}"
     encoded     = base64.b64encode(credentials.encode()).decode()
@@ -57,23 +51,56 @@ async def exchange_code_for_token(code: str) -> dict:
         )
 
         print(f"Token exchange status: {response.status_code}")
-        print(f"Token exchange response: {response.text}")
-
         response.raise_for_status()
         token_data = response.json()
-        token_store["access_token"]  = token_data["access_token"]
-        token_store["refresh_token"] = token_data["refresh_token"]
-        token_store["token_type"]    = token_data["token_type"]
-        return token_data
 
-async def refresh_access_token() -> dict:
-    """Refresh the access token using the refresh token"""
-    refresh_token = token_store.get("refresh_token")
+    access_token  = token_data["access_token"]
+    refresh_token = token_data["refresh_token"]
+    expires_in    = token_data.get("expires_in", 3600)
+
+    # Get user info to store with token
+    yahoo_id = await get_yahoo_user_id(access_token)
+
+    # Save to database if db session provided
+    if db:
+        from models.user_repository import save_tokens
+        await save_tokens(db, yahoo_id, access_token, refresh_token, expires_in)
+
+    return {
+        "yahoo_id":      yahoo_id,
+        "access_token":  access_token,
+        "refresh_token": refresh_token,
+        "expires_in":    expires_in,
+    }
+
+async def get_yahoo_user_id(access_token: str) -> str:
+    """Get Yahoo user GUID from the token"""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.login.yahoo.com/openid/v1/userinfo",
+            headers={ "Authorization": f"Bearer {access_token}" },
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("sub", "default_user")
+        return "default_user"
+
+async def refresh_access_token(yahoo_id: str, db=None) -> str:
+    """Refresh access token using refresh token from database"""
+    if not db:
+        raise Exception("Database session required for token refresh")
+
+    from models.user_repository import get_refresh_token, save_tokens
+    refresh_token = await get_refresh_token(db, yahoo_id)
+
     if not refresh_token:
         raise Exception("No refresh token available — user must re-authenticate")
 
-    credentials = f"{YAHOO_CLIENT_ID}:{YAHOO_CLIENT_SECRET}"
-    encoded     = base64.b64encode(credentials.encode()).decode()
+    client_id     = os.getenv("YAHOO_CLIENT_ID")
+    client_secret = os.getenv("YAHOO_CLIENT_SECRET")
+    redirect_uri  = os.getenv("YAHOO_REDIRECT_URI")
+    credentials   = f"{client_id}:{client_secret}"
+    encoded       = base64.b64encode(credentials.encode()).decode()
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -81,7 +108,7 @@ async def refresh_access_token() -> dict:
             data={
                 "grant_type":    "refresh_token",
                 "refresh_token": refresh_token,
-                "redirect_uri":  YAHOO_REDIRECT_URI,
+                "redirect_uri":  redirect_uri,
             },
             headers={
                 "Authorization": f"Basic {encoded}",
@@ -90,14 +117,25 @@ async def refresh_access_token() -> dict:
         )
         response.raise_for_status()
         token_data = response.json()
-        token_store["access_token"] = token_data["access_token"]
-        return token_data
 
-async def yahoo_api_request(endpoint: str) -> dict:
-    """Make an authenticated request to the Yahoo Fantasy API"""
-    access_token = token_store.get("access_token")
+    new_access_token  = token_data["access_token"]
+    new_refresh_token = token_data.get("refresh_token", refresh_token)
+    expires_in        = token_data.get("expires_in", 3600)
+
+    await save_tokens(db, yahoo_id, new_access_token, new_refresh_token, expires_in)
+    return new_access_token
+
+async def yahoo_api_request(endpoint: str, yahoo_id: str, db=None) -> dict:
+    """Make authenticated request to Yahoo Fantasy API"""
+    if not db:
+        raise Exception("Database session required")
+
+    from models.user_repository import get_active_token
+    access_token = await get_active_token(db, yahoo_id)
+
     if not access_token:
-        raise Exception("Not authenticated — user must connect Yahoo first")
+        # Try to refresh
+        access_token = await refresh_access_token(yahoo_id, db)
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
@@ -109,10 +147,8 @@ async def yahoo_api_request(endpoint: str) -> dict:
             params={"format": "json"},
         )
 
-        # Token expired — refresh and retry
         if response.status_code == 401:
-            await refresh_access_token()
-            access_token = token_store.get("access_token")
+            access_token = await refresh_access_token(yahoo_id, db)
             response = await client.get(
                 f"{YAHOO_API_URL}/{endpoint}",
                 headers={
@@ -125,10 +161,12 @@ async def yahoo_api_request(endpoint: str) -> dict:
         response.raise_for_status()
         return response.json()
 
-async def get_user_leagues() -> list:
-    """Fetch all fantasy football leagues for the authenticated user"""
+async def get_user_leagues(yahoo_id: str, db=None) -> list:
+    """Fetch all fantasy football leagues for authenticated user"""
     data = await yahoo_api_request(
-        "users;use_login=1/games;game_keys=nfl/leagues"
+        "users;use_login=1/games;game_keys=nfl/leagues",
+        yahoo_id,
+        db,
     )
 
     try:
@@ -159,10 +197,44 @@ async def get_user_leagues() -> list:
     except Exception as e:
         raise Exception(f"Failed to parse leagues: {str(e)}")
 
-async def get_roster(league_key: str, team_key: str) -> list:
-    """Fetch the roster for a specific team"""
+async def get_my_team(league_key: str, yahoo_id: str, db=None) -> dict:
+    """Fetch authenticated user's team in a league"""
     data = await yahoo_api_request(
-        f"team/{team_key}/roster/players"
+        f"league/{league_key}/teams",
+        yahoo_id,
+        db,
+    )
+
+    try:
+        teams      = data["fantasy_content"]["league"][1]["teams"]
+        team_count = int(teams["count"])
+
+        for i in range(team_count):
+            team      = teams[str(i)]["team"][0]
+            team_info = {}
+            for item in team:
+                if isinstance(item, dict):
+                    team_info.update(item)
+
+            if team_info.get("is_owned_by_current_login"):
+                return {
+                    "team_key": team_info.get("team_key"),
+                    "team_id":  team_info.get("team_id"),
+                    "name":     team_info.get("name"),
+                    "wins":     team_info.get("wins"),
+                    "losses":   team_info.get("losses"),
+                }
+
+        raise Exception("Could not find user team in league")
+    except Exception as e:
+        raise Exception(f"Failed to parse team: {str(e)}")
+
+async def get_roster(league_key: str, team_key: str, yahoo_id: str, db=None) -> list:
+    """Fetch roster for a specific team"""
+    data = await yahoo_api_request(
+        f"team/{team_key}/roster/players",
+        yahoo_id,
+        db,
     )
 
     try:
@@ -190,33 +262,3 @@ async def get_roster(league_key: str, team_key: str) -> list:
         return players
     except Exception as e:
         raise Exception(f"Failed to parse roster: {str(e)}")
-
-async def get_my_team(league_key: str) -> dict:
-    """Fetch the authenticated user's team in a league"""
-    data = await yahoo_api_request(
-        f"league/{league_key}/teams"
-    )
-
-    try:
-        teams      = data["fantasy_content"]["league"][1]["teams"]
-        team_count = int(teams["count"])
-
-        for i in range(team_count):
-            team      = teams[str(i)]["team"][0]
-            team_info = {}
-            for item in team:
-                if isinstance(item, dict):
-                    team_info.update(item)
-
-            if team_info.get("is_owned_by_current_login"):
-                return {
-                    "team_key": team_info.get("team_key"),
-                    "team_id":  team_info.get("team_id"),
-                    "name":     team_info.get("name"),
-                    "wins":     team_info.get("wins"),
-                    "losses":   team_info.get("losses"),
-                }
-
-        raise Exception("Could not find user team in league")
-    except Exception as e:
-        raise Exception(f"Failed to parse team: {str(e)}")

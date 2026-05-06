@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import odds, scoring, sleeper, yahoo, lineup
+from database import init_db
 import os
 
 app = FastAPI(title="SnapDecision API", version="1.0.0")
@@ -25,6 +26,11 @@ app.include_router(sleeper.router)
 app.include_router(yahoo.router)
 app.include_router(lineup.router)
 
+@app.on_event("startup")
+async def startup():
+    """Initialize database tables on startup"""
+    await init_db()
+    print("Database initialized successfully")
 
 @app.get("/")
 def root():
