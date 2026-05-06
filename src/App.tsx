@@ -3,10 +3,12 @@ import { Box, BottomNavigation, BottomNavigationAction, Paper } from '@mui/mater
 import SportsFootballIcon from '@mui/icons-material/SportsFootball';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import SettingsIcon from '@mui/icons-material/Settings';
 import AppHeader from './components/AppHeader';
 import TeamOverview from './pages/TeamOverview';
 import LineupEval from './pages/LineupEval';
 import PlayerCompare from './pages/PlayerCompare';
+import Settings from './pages/Settings';
 
 const App = () => {
   const [tab, setTab] = useState(0);
@@ -14,12 +16,13 @@ const App = () => {
   return (
     <Box sx={{ maxWidth: 480, mx: 'auto', minHeight: '100dvh', pb: '68px' }}>
 
-      <AppHeader onSettingsClick={() => console.log('settings')} />
+      <AppHeader onSettingsClick={() => setTab(3)} />
 
       <Box>
         {tab === 0 && <TeamOverview onNavigate={setTab} />}
         {tab === 1 && <LineupEval />}
         {tab === 2 && <PlayerCompare />}
+        {tab === 3 && <Settings />}
       </Box>
 
       <Paper
@@ -38,6 +41,7 @@ const App = () => {
           <BottomNavigationAction label="My Team" icon={<SportsFootballIcon />} />
           <BottomNavigationAction label="Lineup" icon={<BoltIcon />} />
           <BottomNavigationAction label="Compare" icon={<CompareArrowsIcon />} />
+          <BottomNavigationAction label="Settings" icon={<SettingsIcon />} />
         </BottomNavigation>
       </Paper>
     </Box>
