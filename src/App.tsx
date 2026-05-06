@@ -3,16 +3,19 @@ import { Box, BottomNavigation, BottomNavigationAction, Paper } from '@mui/mater
 import SportsFootballIcon from '@mui/icons-material/SportsFootball';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
-
+import AppHeader from './components/AppHeader';
 import TeamOverview from './pages/TeamOverview';
 import LineupEval from './pages/LineupEval';
 import PlayerCompare from './pages/PlayerCompare';
 
-export default function App() {
+const App = () => {
   const [tab, setTab] = useState(0);
 
   return (
     <Box sx={{ maxWidth: 480, mx: 'auto', minHeight: '100dvh', pb: '68px' }}>
+
+      <AppHeader onSettingsClick={() => console.log('settings')} />
+
       <Box>
         {tab === 0 && <TeamOverview onNavigate={setTab} />}
         {tab === 1 && <LineupEval />}
@@ -39,4 +42,6 @@ export default function App() {
       </Paper>
     </Box>
   );
-}
+};
+
+export default App;

@@ -59,22 +59,34 @@ async def exchange_code_for_token(code: str, db=None) -> dict:
     expires_in    = token_data.get("expires_in", 3600)
 
     # Get user info to store with token
-    yahoo_id = await get_yahoo_user_id(access_token)
+    user_info = await get_yahoo_user_id(access_token)
 
     # Save to database if db session provided
     if db:
-        from models.user_repository import save_tokens
-        await save_tokens(db, yahoo_id, access_token, refresh_token, expires_in)
+        from models.user_repository import save_tokens, get_or_create_user
+        await get_or_create_user(
+            db,
+            yahoo_id     = user_info["yahoo_id"],
+            display_name = user_info["display_name"],
+            email        = user_info["email"],
+        )
+        await save_tokens(
+            db,
+            user_info["yahoo_id"],
+            access_token,
+            refresh_token,
+            expires_in
+        )
 
     return {
-        "yahoo_id":      yahoo_id,
+        "yahoo_id":      user_info["yahoo_id"],
         "access_token":  access_token,
         "refresh_token": refresh_token,
         "expires_in":    expires_in,
     }
 
-async def get_yahoo_user_id(access_token: str) -> str:
-    """Get Yahoo user GUID from the token"""
+async def get_yahoo_user_id(access_token: str) -> dict:
+    """Get Yahoo user info from the token"""
     async with httpx.AsyncClient() as client:
         response = await client.get(
             "https://api.login.yahoo.com/openid/v1/userinfo",
@@ -82,8 +94,16 @@ async def get_yahoo_user_id(access_token: str) -> str:
         )
         if response.status_code == 200:
             data = response.json()
-            return data.get("sub", "default_user")
-        return "default_user"
+            return {
+                "yahoo_id":     data.get("sub", "default_user"),
+                "display_name": data.get("name") or data.get("given_name", ""),
+                "email":        data.get("email", ""),
+            }
+        return {
+            "yahoo_id":     "default_user",
+            "display_name": None,
+            "email":        None,
+        }
 
 async def refresh_access_token(yahoo_id: str, db=None) -> str:
     """Refresh access token using refresh token from database"""
