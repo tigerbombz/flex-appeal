@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import odds, scoring, sleeper, yahoo, lineup
+from routers import odds, scoring, sleeper, yahoo, lineup, backtest
 from database import init_db
 import os
 
@@ -25,10 +25,10 @@ app.include_router(scoring.router)
 app.include_router(sleeper.router)
 app.include_router(yahoo.router)
 app.include_router(lineup.router)
+app.include_router(backtest.router)
 
 @app.on_event("startup")
 async def startup():
-    """Initialize database tables on startup"""
     await init_db()
     print("Database initialized successfully")
 

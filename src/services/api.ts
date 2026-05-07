@@ -120,4 +120,18 @@ export const yahooApi = {
   connectUrl: () => `${API_URL}/auth/yahoo/login`,
 };
 
+export const backtestApi = {
+  getSummary: async (season: string = '2025') => {
+    const res = await api.get(`/api/backtest/summary?season=${season}`);
+    return res.data;
+  },
+  getHistory: async (season: string = '2025', week?: number) => {
+    const url = week
+      ? `/api/backtest/history?season=${season}&week=${week}`
+      : `/api/backtest/history?season=${season}`;
+    const res = await api.get(url);
+    return res.data;
+  },
+};
+
 export default api;

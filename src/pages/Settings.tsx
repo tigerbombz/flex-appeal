@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -18,7 +18,7 @@ import LinkIcon from '@mui/icons-material/Link';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useYahooStatus, useYahooLeagues } from '../hooks/useYahoo';
-import { yahooApi } from '../services/api';
+import { yahooApi, backtestApi } from '../services/api';
 import ModeSelector from '../components/ModeSelector';
 import { useSettings } from '../context/SettingsContext';
 import type { ScoringFormat } from '../utils/scoring';
@@ -29,9 +29,14 @@ const Settings = () => {
     localStorage.getItem('snapdecision_notifications') === 'true'
   );
   const [saved, setSaved] = useState(false);
+  const [backtestSummary, setBacktestSummary] = useState<any>(null);
 
   const { connected, loading: yahooLoading, sessionExpired, disconnect } = useYahooStatus();
   const { leagues } = useYahooLeagues(connected, sessionExpired);
+
+  useEffect(() => {
+    backtestApi.getSummary('2025').then(setBacktestSummary).catch(console.error);
+  }, []);
 
   const handleSave = () => {
     localStorage.setItem('snapdecision_notifications', String(notifications));
@@ -259,7 +264,7 @@ const Settings = () => {
 
       <Divider sx={{ mb: 3 }} />
 
-      {/* App preferences */}
+      {/* App Preferences */}
       <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
         App Preferences
       </Typography>
@@ -294,6 +299,71 @@ const Settings = () => {
           }
           sx={{ alignItems: 'flex-start', mx: 0 }}
         />
+      </Box>
+
+      <Divider sx={{ mb: 3 }} />
+
+      {/* Engine Accuracy */}
+      <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
+        Engine Accuracy
+      </Typography>
+
+      <Box
+        sx={{
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 3,
+          p: 2,
+          mb: 3,
+        }}
+      >
+        {backtestSummary ? (
+          backtestSummary.total_evaluated === 0 ? (
+            <Box>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.5 }}>
+                No data yet
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                {backtestSummary.message}
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Overall Accuracy</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 700, color: 'primary.main' }}>
+                  {backtestSummary.overall_accuracy}%
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Swap Accuracy</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+                  {backtestSummary.swap_accuracy ?? 'N/A'}%
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Keep Accuracy</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+                  {backtestSummary.keep_accuracy ?? 'N/A'}%
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>Slots Evaluated</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 600 }}>
+                  {backtestSummary.total_evaluated}
+                </Typography>
+              </Box>
+              <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.5 }}>
+                {backtestSummary.message}
+              </Typography>
+            </Box>
+          )
+        ) : (
+          <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+            Loading accuracy data...
+          </Typography>
+        )}
       </Box>
 
       <Divider sx={{ mb: 3 }} />
