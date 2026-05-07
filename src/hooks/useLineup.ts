@@ -47,7 +47,9 @@ export const useLineup = (
   starters: Player[],
   bench: Player[],
   scoringFormat: ScoringFormat,
-  scoringMode: ScoringMode = 'balanced'
+  scoringMode: ScoringMode = 'balanced',
+  week: number = 14,
+  season: string = '2025'
 ) => {
   const [result, setResult] = useState<LineupResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -64,7 +66,9 @@ export const useLineup = (
           starters,
           bench,
           scoringFormat,
-          scoringMode
+          scoringMode,
+          week,
+          season,
         );
         setResult(data);
       } catch (err) {
@@ -76,7 +80,7 @@ export const useLineup = (
     };
 
     evaluate();
-  }, [starters, bench, scoringFormat, scoringMode]);
+  }, [starters, bench, scoringFormat, scoringMode, week, season]);
 
   return { result, loading, error };
 };

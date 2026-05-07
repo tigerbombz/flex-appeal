@@ -76,13 +76,18 @@ export const lineupApi = {
     starters: Player[],
     bench: Player[],
     scoringFormat: ScoringFormat,
-    scoringMode: string = 'balanced'
+    scoringMode: string = 'balanced',
+    week: number = 14,
+    season: string = '2025'
   ) => {
     const res = await api.post('/api/lineup/evaluate', {
       starters,
       bench,
       scoringFormat,
       scoringMode,
+      week,
+      season,
+      team_id: 1,
     });
     return res.data;
   },

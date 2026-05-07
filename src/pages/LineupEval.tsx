@@ -15,7 +15,9 @@ const LineupEval = () => {
     mockRoster.starters,
     mockRoster.bench,
     scoringFormat,
-    scoringMode
+    scoringMode,
+    mockLeague.week,
+    '2025'
   );
 
   return (
