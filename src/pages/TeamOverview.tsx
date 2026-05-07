@@ -22,6 +22,7 @@ import { mockLeague, mockRoster, mockCurrentMatchup } from '../data/mockData';
 import { useNflEvents } from '../hooks/useOdds';
 import { useYahooStatus, useYahooLeagues } from '../hooks/useYahoo';
 import { yahooApi } from '../services/api';
+import MatchHistoryChart from '../components/MatchHistoryChart';
 
 interface Props {
   onNavigate: (tab: number) => void;
@@ -275,6 +276,25 @@ const TeamOverview = ({ onNavigate }: Props) => {
         {mockRoster.bench.map((player) => (
           <PlayerCard key={player.id} player={player} />
         ))}
+      </Box>
+
+      <Divider sx={{ mb: 3 }} />
+
+      {/* Match History */}
+      <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
+        Season Record
+      </Typography>
+      <Box
+        sx={{
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 3,
+          p: 2,
+          mb: 3,
+        }}
+      >
+        <MatchHistoryChart />
       </Box>
 
       <Divider sx={{ mb: 3 }} />
