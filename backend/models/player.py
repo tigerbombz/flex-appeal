@@ -35,52 +35,50 @@ class Volatility(str, Enum):
     MEDIUM = "Medium"
     HIGH   = "High"
 
-class Weather(str, Enum):
-    CLEAR = "Clear"
-    WIND  = "Wind"
-    RAIN  = "Rain"
-    SNOW  = "Snow"
-
 class PlayerInput(BaseModel):
-    id:               int
-    name:             str
-    position:         Position
-    slot:             str
-    team:             str
-    opponent:         str
-    vegasProp:        Optional[float] = None
-    teamTotal:        Optional[float] = None
-    oppTotal:         Optional[float] = None
-    avgYards:         Optional[float] = None
-    usage:            Optional[str]   = None
-    trend:            Trend
-    matchupDifficulty: MatchupDifficulty
-    status:           str
-    oppRank:          Optional[int]   = None
-    oppPointsAllowed: Optional[float] = None
-    snapPct:          Optional[float] = None
-    targetShare:      Optional[float] = None
-    carryShare:       Optional[float] = None
-    volatility:       Volatility      = Volatility.MEDIUM
-    isDome:           bool            = False
-    weather:          Optional[str]   = None
-    pointsLastThree:  list[float]     = []
+    id:                 int
+    name:               str
+    position:           Position
+    slot:               str
+    team:               str
+    opponent:           str
+    passingYardsProp:   Optional[float] = None
+    rushingYardsProp:   Optional[float] = None
+    receivingYardsProp: Optional[float] = None
+    pointsAllowedProp:  Optional[float] = None
+    projectedFgProp:    Optional[float] = None
+    teamTotal:          Optional[float] = None
+    oppTotal:           Optional[float] = None
+    avgYards:           Optional[float] = None
+    usage:              Optional[str]   = None
+    trend:              Trend
+    matchupDifficulty:  MatchupDifficulty
+    status:             str
+    oppRank:            Optional[int]   = None
+    oppPointsAllowed:   Optional[float] = None
+    snapPct:            Optional[float] = None
+    targetShare:        Optional[float] = None
+    carryShare:         Optional[float] = None
+    volatility:         Volatility      = Volatility.MEDIUM
+    isDome:             bool            = False
+    weather:            Optional[str]   = None
+    pointsLastThree:    list[float]     = []
 
 class PlayerScore(BaseModel):
-    id:             int
-    name:           str
-    position:       str
-    team:           str
-    opponent:       str
-    baseScore:      int
-    adjustedScore:  int
-    scoreLabel:     str
-    scoreColor:     str
-    explanation:    str
-    volatility:     str
+    id:              int
+    name:            str
+    position:        str
+    team:            str
+    opponent:        str
+    baseScore:       int
+    adjustedScore:   int
+    scoreLabel:      str
+    scoreColor:      str
+    explanation:     str
+    volatility:      str
     volatilityColor: str
-    floor:          int
-    ceiling:        int
+    floor:           int
+    ceiling:         int
 
 class ScoreRequest(BaseModel):
     players:       list[PlayerInput]

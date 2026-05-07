@@ -21,31 +21,35 @@ export interface SleeperPlayer {
 }
 
 export const toPlayer = (p: SleeperPlayer): Player => ({
-  id:               parseInt(p.id) || Math.floor(Math.random() * 100000),
-  name:             p.name,
-  position:         p.position as Player['position'],
-  slot:             p.position,
-  team:             p.team,
-  opponent:         p.opponent,
-  vegasProp:        p.vegasProp,
-  teamTotal:        p.teamTotal,
-  oppTotal:         null,
-  avgYards:         p.avgYards,
-  usage:            p.usage,
-  trend:            p.trend,
-  score:            50,
-  status:           p.status,
-  matchupDifficulty: p.matchupDifficulty,
-  isLocked:         false,
-  oppRank:          null,
-  oppPointsAllowed: null,
-  snapPct:          null,
-  targetShare:      null,
-  carryShare:       null,
-  volatility:       'Medium',
-  isDome:           false,
-  weather:          'Clear',
-  pointsLastThree:  [],
+  id:                 parseInt(p.id) || Math.floor(Math.random() * 100000),
+  name:               p.name,
+  position:           p.position as Player['position'],
+  slot:               p.position,
+  team:               p.team,
+  opponent:           p.opponent,
+  passingYardsProp:   p.position === 'QB' ? p.vegasProp : null,
+  rushingYardsProp:   p.position === 'RB' ? p.vegasProp : null,
+  receivingYardsProp: ['WR', 'TE'].includes(p.position) ? p.vegasProp : null,
+  pointsAllowedProp:  null,
+  projectedFgProp:    null,
+  teamTotal:          p.teamTotal,
+  oppTotal:           null,
+  avgYards:           p.avgYards,
+  usage:              p.usage,
+  trend:              p.trend,
+  score:              50,
+  status:             p.status,
+  matchupDifficulty:  p.matchupDifficulty,
+  isLocked:           false,
+  oppRank:            null,
+  oppPointsAllowed:   null,
+  snapPct:            null,
+  targetShare:        null,
+  carryShare:         null,
+  volatility:         'Medium',
+  isDome:             false,
+  weather:            'Clear',
+  pointsLastThree:    [],
 });
 
 export const usePlayers = () => {
@@ -54,7 +58,6 @@ export const usePlayers = () => {
   const [error, setError] = useState<string | null>(null);
 
   const search = useCallback(async (query: string, position?: string) => {
-    // Don't search for DST — handled by static pool
     if (position === 'DST') {
       setResults([]);
       return;

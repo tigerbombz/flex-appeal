@@ -5,25 +5,32 @@ export interface Player {
   slot: string;
   team: string;
   opponent: string;
-  vegasProp: number | null;
-  teamTotal: number | null;
-  oppTotal: number | null;
-  avgYards: number | null;
-  usage: 'High' | 'Medium' | 'Low' | null;
-  trend: 'up' | 'neutral' | 'down';
-  score: number;
-  status: 'active' | 'questionable' | 'out';
-  matchupDifficulty: 'Easy' | 'Medium' | 'Hard';
-  isLocked: boolean;
-  oppRank: number | null;
-  oppPointsAllowed: number | null;
-  snapPct: number | null;
-  targetShare: number | null;
-  carryShare: number | null;
-  volatility: 'Low' | 'Medium' | 'High';
-  isDome: boolean;
-  weather: 'Clear' | 'Wind' | 'Rain' | 'Snow' | null;
-  pointsLastThree: number[];
+
+  // Position-specific Vegas props — clear and explicit
+  passingYardsProp:   number | null;  // QB
+  rushingYardsProp:   number | null;  // RB
+  receivingYardsProp: number | null;  // WR, TE
+  pointsAllowedProp:  number | null;  // DST
+  projectedFgProp:    number | null;  // K
+
+  teamTotal:          number | null;
+  oppTotal:           number | null;
+  avgYards:           number | null;
+  usage:              'High' | 'Medium' | 'Low' | null;
+  trend:              'up' | 'neutral' | 'down';
+  score:              number;
+  status:             'active' | 'questionable' | 'out';
+  matchupDifficulty:  'Easy' | 'Medium' | 'Hard';
+  isLocked:           boolean;
+  oppRank:            number | null;
+  oppPointsAllowed:   number | null;
+  snapPct:            number | null;
+  targetShare:        number | null;
+  carryShare:         number | null;
+  volatility:         'Low' | 'Medium' | 'High';
+  isDome:             boolean;
+  weather:            'Clear' | 'Wind' | 'Rain' | 'Snow' | null;
+  pointsLastThree:    number[];
 }
 
 export interface League {
