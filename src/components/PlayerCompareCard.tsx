@@ -29,12 +29,31 @@ const getRankLabel = (rank: number): string => {
   return `#${rank}`;
 };
 
+const getPositionProp = (player: Player): { label: string; value: number } | null => {
+  if (player.position === 'QB' && player.passingYardsProp) {
+    return { label: 'Pass Yds', value: player.passingYardsProp };
+  }
+  if (player.position === 'RB' && player.rushingYardsProp) {
+    return { label: 'Rush Yds', value: player.rushingYardsProp };
+  }
+  if (['WR', 'TE'].includes(player.position) && player.receivingYardsProp) {
+    return { label: 'Rec Yds', value: player.receivingYardsProp };
+  }
+  if (player.position === 'DST' && player.pointsAllowedProp) {
+    return { label: 'Pts Allow', value: player.pointsAllowedProp };
+  }
+  if (player.position === 'K' && player.projectedFgProp) {
+    return { label: 'Proj FG', value: player.projectedFgProp };
+  }
+  return null;
+};
+
 const PlayerCompareCard = ({ player, scoredData, onRemove, onToggleLock, scoringFormat, rank }: Props) => {
-  // Use backend score if available, fall back to mock score
   const adjustedScore = scoredData?.adjustedScore ?? player.score;
-  const explanation = scoredData?.explanation ?? 'Loading explanation...';
-  const scoreColor = getScoreColor(adjustedScore);
-  const scoreLabel = getScoreLabel(adjustedScore);
+  const explanation   = scoredData?.explanation ?? 'Loading explanation...';
+  const scoreColor    = getScoreColor(adjustedScore);
+  const scoreLabel    = getScoreLabel(adjustedScore);
+  const prop          = getPositionProp(player);
 
   return (
     <Box
@@ -127,10 +146,12 @@ const PlayerCompareCard = ({ player, scoredData, onRemove, onToggleLock, scoring
 
       {/* Stats */}
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-        {player.vegasProp && (
+        {prop && (
           <Box sx={{ bgcolor: 'background.default', borderRadius: 1.5, px: 1.5, py: 0.75, textAlign: 'center' }}>
-            <Typography sx={{ fontSize: 9, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>Vegas Prop</Typography>
-            <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{player.vegasProp}</Typography>
+            <Typography sx={{ fontSize: 9, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              {prop.label}
+            </Typography>
+            <Typography sx={{ fontSize: 14, fontWeight: 600 }}>{prop.value}</Typography>
           </Box>
         )}
         {player.teamTotal && (
@@ -165,7 +186,7 @@ const PlayerCompareCard = ({ player, scoredData, onRemove, onToggleLock, scoring
         </Box>
       </Box>
 
-      {/* Explanation from backend */}
+      {/* Explanation */}
       <Box sx={{ bgcolor: 'background.default', borderRadius: 1.5, px: 1.5, py: 1, display: 'flex', gap: 1, alignItems: 'flex-start' }}>
         <Typography sx={{ fontSize: 13 }}>💡</Typography>
         <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.5 }}>
