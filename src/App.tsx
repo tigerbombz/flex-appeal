@@ -18,7 +18,7 @@ const App = () => {
   return (
     <Box
       sx={{
-        maxWidth: isDesktop ? 1100 : 480,
+        maxWidth: isDesktop ? 1400 : 480,
         mx: 'auto',
         minHeight: '100dvh',
         pb: '68px',
