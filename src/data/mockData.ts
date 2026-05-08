@@ -7,7 +7,7 @@ import type {
 } from '../types';
 
 export const mockLeague: League = {
-  name:          'The Chau Slayer',
+  name:          'Hanky Slayer',
   scoringFormat: 'PPR',
   week:          14,
   record:        '8-5',
