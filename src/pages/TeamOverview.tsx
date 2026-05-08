@@ -10,6 +10,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
@@ -18,17 +20,20 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PlayerCard from '../components/PlayerCard';
 import FreshnessBadge from '../components/FreshnessBadge';
+import MatchHistoryChart from '../components/MatchHistoryChart';
 import { mockLeague, mockRoster, mockCurrentMatchup } from '../data/mockData';
 import { useNflEvents } from '../hooks/useOdds';
 import { useYahooStatus, useYahooLeagues } from '../hooks/useYahoo';
 import { yahooApi } from '../services/api';
-import MatchHistoryChart from '../components/MatchHistoryChart';
 
 interface Props {
   onNavigate: (tab: number) => void;
 }
 
 const TeamOverview = ({ onNavigate }: Props) => {
+  const theme     = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+
   const { events, loading, error, lastUpdated } = useNflEvents();
   const { connected, loading: yahooLoading, sessionExpired, disconnect } = useYahooStatus();
   const { leagues, loading: leaguesLoading, error: leaguesError } = useYahooLeagues(connected, sessionExpired);
@@ -50,7 +55,7 @@ const TeamOverview = ({ onNavigate }: Props) => {
         <FreshnessBadge lastUpdated={lastUpdated} loading={loading} />
       </Box>
 
-      {/* Yahoo not connected */}
+      {/* Yahoo connect banner */}
       {!yahooLoading && !connected && (
         <Box
           sx={{
@@ -67,9 +72,7 @@ const TeamOverview = ({ onNavigate }: Props) => {
           }}
         >
           <Box>
-            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
-              Connect Yahoo Fantasy
-            </Typography>
+            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>Connect Yahoo Fantasy</Typography>
             <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5 }}>
               Pull your real roster and league settings
             </Typography>
@@ -120,11 +123,7 @@ const TeamOverview = ({ onNavigate }: Props) => {
             >
               Reconnect
             </Button>
-            <Button
-              size="small"
-              onClick={disconnect}
-              sx={{ fontSize: 11, color: 'text.secondary' }}
-            >
+            <Button size="small" onClick={disconnect} sx={{ fontSize: 11, color: 'text.secondary' }}>
               Disconnect
             </Button>
           </Box>
@@ -161,12 +160,8 @@ const TeamOverview = ({ onNavigate }: Props) => {
               )}
             </Box>
           </Box>
-
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {leaguesLoading && (
-              <Skeleton variant="rounded" width={160} height={36} />
-            )}
-
+            {leaguesLoading && <Skeleton variant="rounded" width={160} height={36} />}
             {!leaguesLoading && leagues.length > 0 && (
               <FormControl size="small" sx={{ minWidth: 160 }}>
                 <InputLabel>Select League</InputLabel>
@@ -183,150 +178,24 @@ const TeamOverview = ({ onNavigate }: Props) => {
                 </Select>
               </FormControl>
             )}
-
-            <Button
-              size="small"
-              onClick={disconnect}
-              sx={{ fontSize: 11, color: 'text.secondary' }}
-            >
+            <Button size="small" onClick={disconnect} sx={{ fontSize: 11, color: 'text.secondary' }}>
               Disconnect
             </Button>
           </Box>
         </Box>
       )}
 
-      {/* Current matchup banner */}
+      {/* Matchup banner + CTA — side by side on desktop */}
       <Box
         sx={{
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 3,
-          px: 2,
-          py: 1.5,
-          mb: 2,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <Box>
-          <Typography sx={{ fontSize: 11, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
-            This Week
-          </Typography>
-          <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
-            vs {mockCurrentMatchup.opponent}
-          </Typography>
-          <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-            {mockCurrentMatchup.opponentRecord}
-          </Typography>
-        </Box>
-        <Box sx={{ textAlign: 'right' }}>
-          <Typography sx={{ fontSize: 11, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
-            Projected
-          </Typography>
-          <Typography sx={{ fontWeight: 700, fontSize: 20, color: 'primary.main' }}>
-            {mockCurrentMatchup.myProjected}
-          </Typography>
-          <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-            vs {mockCurrentMatchup.opponentProjected}
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* CTA Buttons */}
-      <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>
-        <Button
-          variant="contained"
-          fullWidth
-          startIcon={<BoltIcon />}
-          onClick={() => onNavigate(1)}
-          sx={{ fontWeight: 700, py: 1.2 }}
-        >
-          Evaluate Lineup
-        </Button>
-        <Button
-          variant="outlined"
-          fullWidth
-          startIcon={<CompareArrowsIcon />}
-          onClick={() => onNavigate(2)}
-          sx={{ fontWeight: 600, py: 1.2 }}
-        >
-          Compare Players
-        </Button>
-      </Box>
-
-      {/* Starters */}
-      <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1 }}>
-        Starters
-      </Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 3 }}>
-        {mockRoster.starters.map((player) => (
-          <PlayerCard key={player.id} player={player} />
-        ))}
-      </Box>
-
-      <Divider sx={{ mb: 3 }} />
-
-      {/* Bench */}
-      <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1 }}>
-        Bench
-      </Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, opacity: 0.75, mb: 3 }}>
-        {mockRoster.bench.map((player) => (
-          <PlayerCard key={player.id} player={player} />
-        ))}
-      </Box>
-
-      <Divider sx={{ mb: 3 }} />
-
-      {/* Match History */}
-      <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
-        Season Record
-      </Typography>
-      <Box
-        sx={{
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 3,
-          p: 2,
+          display: 'grid',
+          gridTemplateColumns: isDesktop ? '1fr 1fr' : '1fr',
+          gap: 2,
           mb: 3,
         }}
       >
-        <MatchHistoryChart />
-      </Box>
-
-      <Divider sx={{ mb: 3 }} />
-
-      {/* Upcoming NFL Games */}
-      <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1 }}>
-        Upcoming NFL Games
-      </Typography>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2, fontSize: 13 }}>
-          {error} — check your API key in backend/.env
-        </Alert>
-      )}
-
-      {loading && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} variant="rounded" height={60} sx={{ borderRadius: 3 }} />
-          ))}
-        </Box>
-      )}
-
-      {!loading && !error && events.length === 0 && (
-        <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
-          No upcoming NFL games found — it may be the offseason.
-        </Typography>
-      )}
-
-      {!loading && events.map((event) => (
+        {/* Current matchup */}
         <Box
-          key={event.id}
           sx={{
             bgcolor: 'background.paper',
             border: '1px solid',
@@ -334,28 +203,192 @@ const TeamOverview = ({ onNavigate }: Props) => {
             borderRadius: 3,
             px: 2,
             py: 1.5,
-            mb: 1,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
           <Box>
+            <Typography sx={{ fontSize: 11, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
+              This Week
+            </Typography>
             <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
-              {event.away_team} @ {event.home_team}
+              vs {mockCurrentMatchup.opponent}
             </Typography>
             <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-              {new Date(event.commence_time).toLocaleDateString([], {
-                weekday: 'short',
-                month:   'short',
-                day:     'numeric',
-                hour:    '2-digit',
-                minute:  '2-digit',
-              })}
+              {mockCurrentMatchup.opponentRecord}
+            </Typography>
+          </Box>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography sx={{ fontSize: 11, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
+              Projected
+            </Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: 20, color: 'primary.main' }}>
+              {mockCurrentMatchup.myProjected}
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+              vs {mockCurrentMatchup.opponentProjected}
             </Typography>
           </Box>
         </Box>
-      ))}
+
+        {/* CTA buttons */}
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'stretch' }}>
+          <Button
+            variant="contained"
+            fullWidth
+            startIcon={<BoltIcon />}
+            onClick={() => onNavigate(1)}
+            sx={{ fontWeight: 700, py: 1.2 }}
+          >
+            Evaluate Lineup
+          </Button>
+          <Button
+            variant="outlined"
+            fullWidth
+            startIcon={<CompareArrowsIcon />}
+            onClick={() => onNavigate(2)}
+            sx={{ fontWeight: 600, py: 1.2 }}
+          >
+            Compare Players
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Roster — two columns on desktop */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: isDesktop ? '1fr 1fr' : '1fr',
+          gap: 3,
+          mb: 3,
+        }}
+      >
+        {/* Starters */}
+        <Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1 }}>
+            Starters
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {mockRoster.starters.map((player) => (
+              <PlayerCard key={player.id} player={player} />
+            ))}
+          </Box>
+        </Box>
+
+        {/* Bench */}
+        <Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1 }}>
+            Bench
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, opacity: 0.75 }}>
+            {mockRoster.bench.map((player) => (
+              <PlayerCard key={player.id} player={player} />
+            ))}
+          </Box>
+        </Box>
+      </Box>
+
+      <Divider sx={{ mb: 3 }} />
+
+      {/* Season record + upcoming games — side by side on desktop */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: isDesktop ? '1fr 1fr' : '1fr',
+          gap: 3,
+          mb: 3,
+        }}
+      >
+        {/* Match history chart */}
+        <Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
+            Season Record
+          </Typography>
+          <Box
+            sx={{
+              bgcolor: 'background.paper',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 3,
+              p: 2,
+            }}
+          >
+            <MatchHistoryChart />
+          </Box>
+        </Box>
+
+        {/* Upcoming NFL Games */}
+        <Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
+            Upcoming NFL Games
+          </Typography>
+
+          {error && (
+            <Alert severity="error" sx={{ mb: 2, fontSize: 13 }}>
+              {error}
+            </Alert>
+          )}
+
+          {loading && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} variant="rounded" height={60} sx={{ borderRadius: 3 }} />
+              ))}
+            </Box>
+          )}
+
+          {!loading && !error && events.length === 0 && (
+            <Box
+              sx={{
+                bgcolor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 3,
+                p: 2,
+              }}
+            >
+              <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+                No upcoming NFL games found — it may be the offseason.
+              </Typography>
+            </Box>
+          )}
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {!loading && events.map((event) => (
+              <Box
+                key={event.id}
+                sx={{
+                  bgcolor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 3,
+                  px: 2,
+                  py: 1.5,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <Box>
+                  <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+                    {event.away_team} @ {event.home_team}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
+                    {new Date(event.commence_time).toLocaleDateString([], {
+                      weekday: 'short',
+                      month:   'short',
+                      day:     'numeric',
+                      hour:    '2-digit',
+                      minute:  '2-digit',
+                    })}
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+      </Box>
 
     </Box>
   );

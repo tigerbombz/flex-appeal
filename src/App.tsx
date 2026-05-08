@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, BottomNavigation, BottomNavigationAction, Paper } from '@mui/material';
+import { Box, BottomNavigation, BottomNavigationAction, Paper, useMediaQuery, useTheme } from '@mui/material';
 import SportsFootballIcon from '@mui/icons-material/SportsFootball';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
@@ -12,10 +12,19 @@ import Settings from './pages/Settings';
 
 const App = () => {
   const [tab, setTab] = useState(0);
+  const theme         = useTheme();
+  const isDesktop     = useMediaQuery(theme.breakpoints.up('md'));
 
   return (
-    <Box sx={{ maxWidth: 480, mx: 'auto', minHeight: '100dvh', pb: '68px' }}>
-
+    <Box
+      sx={{
+        maxWidth: isDesktop ? 1100 : 480,
+        mx: 'auto',
+        minHeight: '100dvh',
+        pb: '68px',
+        px: isDesktop ? 3 : 0,
+      }}
+    >
       <AppHeader onSettingsClick={() => setTab(3)} />
 
       <Box>
@@ -32,7 +41,7 @@ const App = () => {
           left: '50%',
           transform: 'translateX(-50%)',
           width: '100%',
-          maxWidth: 480,
+          maxWidth: isDesktop ? 1100 : 480,
           zIndex: 10,
         }}
         elevation={3}
