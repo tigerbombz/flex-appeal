@@ -12,8 +12,6 @@ import {
   Alert,
   CircularProgress,
   TextField,
-  useMediaQuery,
-  useTheme,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import PlayerCompareCard from '../components/PlayerCompareCard';
@@ -30,10 +28,15 @@ type PositionFilter = 'ALL' | 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DST';
 
 const dstPool: Player[] = NFL_TEAMS.map(dstToPlayer);
 
-const PlayerCompare = () => {
-  const theme     = useTheme();
-  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+const getGridColumns = (count: number): string => {
+  if (count <= 1) return '1fr';
+  if (count === 2) return '1fr 1fr';
+  if (count === 3) return '1fr 1fr 1fr';
+  if (count === 4) return '1fr 1fr';
+  return '1fr 1fr';
+};
 
+const PlayerCompare = () => {
   const { scoringFormat, scoringMode, setScoringFormat, setScoringMode } = useSettings();
   const [comparedPlayers, setComparedPlayers] = useState<Player[]>([
     mockRoster.starters[3],
@@ -126,28 +129,28 @@ const PlayerCompare = () => {
     return `${p.name} · ${p.position} · ${p.team}`;
   };
 
-  // Controls panel — shared between both layouts
-  const ControlsPanel = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+  return (
+    <Box sx={{ p: 2 }}>
 
       {/* Header */}
-      <Box>
+      <Box sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           Player Compare
         </Typography>
         <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 0.5 }}>
-          Compare up to 5 players · QB, RB, WR, TE, K, D/ST
+          Compare up to 5 players · QB, RB, WR, TE, K, D/ST supported
         </Typography>
       </Box>
 
+      {/* Error */}
       {error && (
-        <Alert severity="warning" sx={{ fontSize: 13 }}>
+        <Alert severity="warning" sx={{ mb: 2, fontSize: 13 }}>
           {error}
         </Alert>
       )}
 
-      {/* Format + position */}
-      <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+      {/* Settings row — full width */}
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <FormControl size="small" sx={{ minWidth: 110 }}>
           <InputLabel>Format</InputLabel>
           <Select
@@ -186,8 +189,8 @@ const PlayerCompare = () => {
         <ModeSelector mode={scoringMode} onChange={setScoringMode} />
       </Box>
 
-      {/* Search */}
-      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+      {/* Search + add — full width */}
+      <Box sx={{ display: 'flex', gap: 1, mb: 3, alignItems: 'center' }}>
         <Autocomplete
           value={searchValue}
           inputValue={inputValue}
@@ -246,7 +249,7 @@ const PlayerCompare = () => {
         </Button>
       </Box>
 
-      {/* Verdict banner */}
+      {/* Verdict banner — full width */}
       {topPlayer && (
         <Box
           sx={{
@@ -254,13 +257,22 @@ const PlayerCompare = () => {
             borderRadius: 3,
             px: 2,
             py: 1.5,
+            mb: 2,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
           <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#000', textTransform: 'uppercase', letterSpacing: 1 }}>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#000',
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+              }}
+            >
               {scoreLoading ? 'Calculating...' : `Top Pick · ${scoringFormat} · ${scoringMode}`}
             </Typography>
             <Typography sx={{ fontSize: 20, fontWeight: 700, color: '#000' }}>
@@ -280,12 +292,43 @@ const PlayerCompare = () => {
         </Box>
       )}
 
+      <Divider sx={{ mb: 2 }} />
+
+      {/* Player cards — responsive grid based on count */}
+      {comparedPlayers.length > 0 && (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: getGridColumns(sortedPlayers.length),
+            },
+            gap: 2,
+            alignItems: 'start',
+          }}
+        >
+          {sortedPlayers.map((player, index) => (
+            <PlayerCompareCard
+              key={player.id}
+              player={player}
+              scoredData={scoredPlayers.find((s) => s.id === player.id) ?? null}
+              onRemove={handleRemove}
+              onToggleLock={handleToggleLock}
+              scoringFormat={scoringFormat}
+              rank={index + 1}
+            />
+          ))}
+        </Box>
+      )}
+
+      {/* Max players notice */}
       {comparedPlayers.length >= 5 && (
-        <Typography sx={{ fontSize: 12, color: 'text.secondary', textAlign: 'center' }}>
+        <Typography sx={{ mt: 2, fontSize: 12, color: 'text.secondary', textAlign: 'center' }}>
           Maximum of 5 players reached — remove one to add another.
         </Typography>
       )}
 
+      {/* Empty state */}
       {comparedPlayers.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 6 }}>
           <Typography sx={{ fontSize: 32, mb: 1 }}>⚖️</Typography>
@@ -295,57 +338,7 @@ const PlayerCompare = () => {
           </Typography>
         </Box>
       )}
-    </Box>
-  );
 
-  // Player cards panel
-  const CardsPanel = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {sortedPlayers.map((player, index) => (
-        <PlayerCompareCard
-          key={player.id}
-          player={player}
-          scoredData={scoredPlayers.find((s) => s.id === player.id) ?? null}
-          onRemove={handleRemove}
-          onToggleLock={handleToggleLock}
-          scoringFormat={scoringFormat}
-          rank={index + 1}
-        />
-      ))}
-    </Box>
-  );
-
-  return (
-    <Box sx={{ p: 2 }}>
-      {isDesktop ? (
-        // Desktop — two column layout
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: '380px 1fr',
-            gap: 3,
-            alignItems: 'start',
-          }}
-        >
-          {/* Left — controls sticky on desktop */}
-          <Box sx={{ position: 'sticky', top: 72 }}>
-            {ControlsPanel}
-          </Box>
-
-          {/* Right — player cards */}
-          <Box>
-            <Divider sx={{ mb: 2, display: { xs: 'none', md: 'block' } }} />
-            {CardsPanel}
-          </Box>
-        </Box>
-      ) : (
-        // Mobile — single column stacked
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {ControlsPanel}
-          <Divider />
-          {CardsPanel}
-        </Box>
-      )}
     </Box>
   );
 };
