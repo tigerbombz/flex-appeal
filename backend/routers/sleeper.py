@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from services.sleeper_service import get_all_nfl_players, parse_sleeper_players
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/players", tags=["players"])
 
@@ -12,9 +12,9 @@ async def ensure_cache():
     """Load cache if empty"""
     global _player_cache, _cache_timestamp
     if not _player_cache:
-        raw = await get_all_nfl_players()
-        _player_cache = parse_sleeper_players(raw)
-        _cache_timestamp = datetime.now().isoformat()
+        raw              = await get_all_nfl_players()
+        _player_cache    = parse_sleeper_players(raw)
+        _cache_timestamp = datetime.now(timezone.utc).isoformat()
 
 @router.get("/nfl")
 async def fetch_nfl_players(
@@ -33,11 +33,9 @@ async def fetch_nfl_players(
         await ensure_cache()
         players = list(_player_cache)
 
-        # Filter by position
         if position and position.upper() not in ("ALL", "DST"):
             players = [p for p in players if p["position"] == position.upper()]
 
-        # Filter by search term
         if search and len(search) >= 1:
             search_lower = search.lower()
             players = [
@@ -78,6 +76,6 @@ async def fetch_player_by_id(player_id: str):
 async def clear_cache():
     """Clear player cache to force fresh fetch"""
     global _player_cache, _cache_timestamp
-    _player_cache = []
+    _player_cache    = []
     _cache_timestamp = None
     return { "message": "Cache cleared — next request will re-fetch from Sleeper" }
