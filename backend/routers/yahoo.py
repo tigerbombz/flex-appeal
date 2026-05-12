@@ -43,9 +43,12 @@ async def yahoo_status(db: AsyncSession = Depends(get_db)):
         if not user or not user.access_token:
             return { "connected": False }
         return {
-            "connected":    True,
-            "display_name": user.display_name,
-            "yahoo_id":     user.yahoo_id,
+            "connected":      True,
+            "yahoo_id":       user.yahoo_id,
+            "display_name":   user.display_name,
+            "email":          user.email,
+            "scoring_format": user.scoring_format,
+            "scoring_mode":   user.scoring_mode,
         }
     except Exception:
         return { "connected": False }

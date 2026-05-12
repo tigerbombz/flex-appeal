@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, BottomNavigation, BottomNavigationAction, Paper, useMediaQuery, useTheme } from '@mui/material';
+import { Box, BottomNavigation, BottomNavigationAction, Paper, useMediaQuery, useTheme, CircularProgress } from '@mui/material';
 import SportsFootballIcon from '@mui/icons-material/SportsFootball';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
@@ -9,11 +9,38 @@ import TeamOverview from './pages/TeamOverview';
 import LineupEval from './pages/LineupEval';
 import PlayerCompare from './pages/PlayerCompare';
 import Settings from './pages/Settings';
+import Landing from './pages/Landing';
+import { useAuthContext } from './context/AuthContext';
+
+const ACTIVE_TAB_KEY  = 'snapdecision_active_tab';
+const AUTH_ENABLED    = import.meta.env.VITE_AUTH_ENABLED === 'true';
 
 const App = () => {
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState<number>(
+    parseInt(localStorage.getItem(ACTIVE_TAB_KEY) || '0')
+  );
   const theme         = useTheme();
   const isDesktop     = useMediaQuery(theme.breakpoints.up('md'));
+  const { user, loading, checked } = useAuthContext();
+
+  const handleTabChange = (newTab: number) => {
+    localStorage.setItem(ACTIVE_TAB_KEY, String(newTab));
+    setTab(newTab);
+  };
+
+  // Show spinner while checking auth
+  if (AUTH_ENABLED && !checked) {
+    return (
+      <Box sx={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // Show landing page if auth is enabled and user is not logged in
+  if (AUTH_ENABLED && !user) {
+    return <Landing />;
+  }
 
   return (
     <Box
@@ -22,13 +49,13 @@ const App = () => {
         mx: 'auto',
         minHeight: '100dvh',
         pb: '68px',
-        px: isDesktop ? 3 : 0,
+        px: isDesktop ? 4 : 0,
       }}
     >
-      <AppHeader onSettingsClick={() => setTab(3)} />
+      <AppHeader onSettingsClick={() => handleTabChange(3)} />
 
       <Box>
-        {tab === 0 && <TeamOverview onNavigate={setTab} />}
+        {tab === 0 && <TeamOverview onNavigate={handleTabChange} />}
         {tab === 1 && <LineupEval />}
         {tab === 2 && <PlayerCompare />}
         {tab === 3 && <Settings />}
@@ -38,15 +65,13 @@ const App = () => {
         sx={{
           position: 'fixed',
           bottom: 0,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '100%',
-          maxWidth: isDesktop ? 1100 : 480,
+          left: 0,
+          right: 0,
           zIndex: 10,
         }}
         elevation={3}
       >
-        <BottomNavigation value={tab} onChange={(_, val) => setTab(val)}>
+        <BottomNavigation value={tab} onChange={(_, val) => handleTabChange(val)}>
           <BottomNavigationAction label="My Team" icon={<SportsFootballIcon />} />
           <BottomNavigationAction label="Lineup" icon={<BoltIcon />} />
           <BottomNavigationAction label="Compare" icon={<CompareArrowsIcon />} />
