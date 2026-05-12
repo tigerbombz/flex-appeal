@@ -21,7 +21,7 @@ const App = () => {
   );
   const theme         = useTheme();
   const isDesktop     = useMediaQuery(theme.breakpoints.up('md'));
-  const { user, loading, checked } = useAuthContext();
+  const { user, checked } = useAuthContext();
 
   const handleTabChange = (newTab: number) => {
     localStorage.setItem(ACTIVE_TAB_KEY, String(newTab));
