@@ -10,6 +10,7 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Chip,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
@@ -21,9 +22,10 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import PlayerCard from '../components/PlayerCard';
 import FreshnessBadge from '../components/FreshnessBadge';
 import MatchHistoryChart from '../components/MatchHistoryChart';
-import { mockLeague, mockRoster, mockCurrentMatchup } from '../data/mockData';
+import { mockCurrentMatchup } from '../data/mockData';
 import { useNflEvents } from '../hooks/useOdds';
 import { useYahooStatus, useYahooLeagues } from '../hooks/useYahoo';
+import { useRoster } from '../hooks/useRoster';
 import { yahooApi } from '../services/api';
 
 interface Props {
@@ -34,10 +36,13 @@ const TeamOverview = ({ onNavigate }: Props) => {
   const theme     = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
-  const { events, loading, error, lastUpdated } = useNflEvents();
-  const { connected, loading: yahooLoading, sessionExpired, disconnect } = useYahooStatus();
-  const { leagues, loading: leaguesLoading, error: leaguesError } = useYahooLeagues(connected, sessionExpired);
-  const [selectedLeague, setSelectedLeague] = useState<string>('');
+  const { events, loading: eventsLoading, error: eventsError, lastUpdated } = useNflEvents();
+  const { connected, loading: yahooLoading, sessionExpired, disconnect }    = useYahooStatus();
+  const { leagues, loading: leaguesLoading, error: leaguesError }           = useYahooLeagues(connected, sessionExpired);
+  const [selectedLeague, setSelectedLeague]                                  = useState<string>('');
+
+  // Smart roster — real Yahoo data if available, mock as fallback
+  const roster = useRoster(connected, sessionExpired, selectedLeague);
 
   return (
     <Box sx={{ p: 2 }}>
@@ -45,17 +50,54 @@ const TeamOverview = ({ onNavigate }: Props) => {
       {/* League header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            {mockLeague.name}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              {roster.leagueName}
+            </Typography>
+            {roster.isRealData && (
+              <Chip
+                label="Live"
+                size="small"
+                sx={{
+                  fontSize: 10,
+                  height: 20,
+                  bgcolor: '#22c55e20',
+                  color: '#22c55e',
+                  border: '1px solid #22c55e40',
+                  fontWeight: 700,
+                }}
+              />
+            )}
+            {!roster.isRealData && (
+              <Chip
+                label="Mock Data"
+                size="small"
+                sx={{
+                  fontSize: 10,
+                  height: 20,
+                  bgcolor: '#eab30820',
+                  color: '#eab308',
+                  border: '1px solid #eab30840',
+                  fontWeight: 700,
+                }}
+              />
+            )}
+          </Box>
           <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 0.5 }}>
-            {mockLeague.scoringFormat} · {mockLeague.record} · {mockLeague.standing} · Week {mockLeague.week}
+            {roster.scoringFormat} · Week {roster.week}
           </Typography>
         </Box>
-        <FreshnessBadge lastUpdated={lastUpdated} loading={loading} />
+        <FreshnessBadge lastUpdated={lastUpdated} loading={eventsLoading} />
       </Box>
 
-      {/* Yahoo connect banner */}
+      {/* Roster error */}
+      {roster.error && (
+        <Alert severity="warning" sx={{ mb: 2, fontSize: 13 }}>
+          {roster.error}
+        </Alert>
+      )}
+
+      {/* Yahoo not connected */}
       {!yahooLoading && !connected && (
         <Box
           sx={{
@@ -72,7 +114,9 @@ const TeamOverview = ({ onNavigate }: Props) => {
           }}
         >
           <Box>
-            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>Connect Yahoo Fantasy</Typography>
+            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+              Connect Yahoo Fantasy
+            </Typography>
             <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5 }}>
               Pull your real roster and league settings
             </Typography>
@@ -110,7 +154,7 @@ const TeamOverview = ({ onNavigate }: Props) => {
               Yahoo Session Expired
             </Typography>
             <Typography sx={{ fontSize: 12, color: 'text.secondary', mt: 0.5 }}>
-              Your session expired — click to reconnect
+              Reconnect to load your real roster
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -119,11 +163,15 @@ const TeamOverview = ({ onNavigate }: Props) => {
               size="small"
               startIcon={<RefreshIcon />}
               onClick={() => window.location.href = yahooApi.connectUrl()}
-              sx={{ fontWeight: 600, whiteSpace: 'nowrap', bgcolor: '#eab308', '&:hover': { bgcolor: '#ca9d07' } }}
+              sx={{ fontWeight: 600, bgcolor: '#eab308', '&:hover': { bgcolor: '#ca9d07' } }}
             >
               Reconnect
             </Button>
-            <Button size="small" onClick={disconnect} sx={{ fontSize: 11, color: 'text.secondary' }}>
+            <Button
+              size="small"
+              onClick={disconnect}
+              sx={{ fontSize: 11, color: 'text.secondary' }}
+            >
               Disconnect
             </Button>
           </Box>
@@ -153,15 +201,17 @@ const TeamOverview = ({ onNavigate }: Props) => {
               <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#22c55e' }}>
                 Yahoo Connected
               </Typography>
-              {leaguesError === 'offseason' && (
+              {leagues.length === 0 && !leaguesLoading && (
                 <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
-                  No active leagues yet — check back when the season starts
+                  No active leagues — showing mock data until season starts
                 </Typography>
               )}
             </Box>
           </Box>
+
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {leaguesLoading && <Skeleton variant="rounded" width={160} height={36} />}
+
             {!leaguesLoading && leagues.length > 0 && (
               <FormControl size="small" sx={{ minWidth: 160 }}>
                 <InputLabel>Select League</InputLabel>
@@ -178,14 +228,19 @@ const TeamOverview = ({ onNavigate }: Props) => {
                 </Select>
               </FormControl>
             )}
-            <Button size="small" onClick={disconnect} sx={{ fontSize: 11, color: 'text.secondary' }}>
+
+            <Button
+              size="small"
+              onClick={disconnect}
+              sx={{ fontSize: 11, color: 'text.secondary' }}
+            >
               Disconnect
             </Button>
           </Box>
         </Box>
       )}
 
-      {/* Matchup banner + CTA — side by side on desktop */}
+      {/* Matchup banner + CTA */}
       <Box
         sx={{
           display: 'grid',
@@ -194,7 +249,6 @@ const TeamOverview = ({ onNavigate }: Props) => {
           mb: 3,
         }}
       >
-        {/* Current matchup */}
         <Box
           sx={{
             bgcolor: 'background.paper',
@@ -232,7 +286,6 @@ const TeamOverview = ({ onNavigate }: Props) => {
           </Box>
         </Box>
 
-        {/* CTA buttons */}
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'stretch' }}>
           <Button
             variant="contained"
@@ -255,43 +308,52 @@ const TeamOverview = ({ onNavigate }: Props) => {
         </Box>
       </Box>
 
-      {/* Roster — two columns on desktop */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: isDesktop ? '1fr 1fr' : '1fr',
-          gap: 3,
-          mb: 3,
-        }}
-      >
-        {/* Starters */}
-        <Box>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1 }}>
-            Starters
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {mockRoster.starters.map((player) => (
-              <PlayerCard key={player.id} player={player} />
-            ))}
-          </Box>
+      {/* Roster loading state */}
+      {roster.loading && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 3 }}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} variant="rounded" height={64} sx={{ borderRadius: 3 }} />
+          ))}
         </Box>
+      )}
 
-        {/* Bench */}
-        <Box>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1 }}>
-            Bench
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, opacity: 0.75 }}>
-            {mockRoster.bench.map((player) => (
-              <PlayerCard key={player.id} player={player} />
-            ))}
+      {/* Roster — two columns on desktop */}
+      {!roster.loading && (
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: isDesktop ? '1fr 1fr' : '1fr',
+            gap: 3,
+            mb: 3,
+          }}
+        >
+          <Box>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1 }}>
+              Starters
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {roster.starters.map((player) => (
+                <PlayerCard key={player.id} player={player} />
+              ))}
+            </Box>
+          </Box>
+
+          <Box>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1 }}>
+              Bench
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, opacity: 0.75 }}>
+              {roster.bench.map((player) => (
+                <PlayerCard key={player.id} player={player} />
+              ))}
+            </Box>
           </Box>
         </Box>
-      </Box>
+      )}
 
       <Divider sx={{ mb: 3 }} />
 
-      {/* Season record + upcoming games — side by side on desktop */}
+      {/* Season record + upcoming games */}
       <Box
         sx={{
           display: 'grid',
@@ -300,7 +362,6 @@ const TeamOverview = ({ onNavigate }: Props) => {
           mb: 3,
         }}
       >
-        {/* Match history chart */}
         <Box>
           <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
             Season Record
@@ -318,19 +379,18 @@ const TeamOverview = ({ onNavigate }: Props) => {
           </Box>
         </Box>
 
-        {/* Upcoming NFL Games */}
         <Box>
           <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
             Upcoming NFL Games
           </Typography>
 
-          {error && (
+          {eventsError && (
             <Alert severity="error" sx={{ mb: 2, fontSize: 13 }}>
-              {error}
+              {eventsError}
             </Alert>
           )}
 
-          {loading && (
+          {eventsLoading && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} variant="rounded" height={60} sx={{ borderRadius: 3 }} />
@@ -338,7 +398,7 @@ const TeamOverview = ({ onNavigate }: Props) => {
             </Box>
           )}
 
-          {!loading && !error && events.length === 0 && (
+          {!eventsLoading && !eventsError && events.length === 0 && (
             <Box
               sx={{
                 bgcolor: 'background.paper',
@@ -349,13 +409,13 @@ const TeamOverview = ({ onNavigate }: Props) => {
               }}
             >
               <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
-                No upcoming NFL games found — it may be the offseason.
+                No upcoming NFL games — check back when the season starts.
               </Typography>
             </Box>
           )}
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {!loading && events.map((event) => (
+            {!eventsLoading && events.map((event) => (
               <Box
                 key={event.id}
                 sx={{
