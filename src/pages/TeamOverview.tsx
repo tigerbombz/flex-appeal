@@ -30,16 +30,17 @@ import { yahooApi } from '../services/api';
 
 interface Props {
   onNavigate: (tab: number) => void;
+  selectedLeague: string;
+  onChangeLeague: (key: string) => void;
 }
 
-const TeamOverview = ({ onNavigate }: Props) => {
+const TeamOverview = ({ onNavigate, selectedLeague, onChangeLeague }: Props) => {
   const theme     = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
   const { events, loading: eventsLoading, error: eventsError, lastUpdated } = useNflEvents();
   const { connected, loading: yahooLoading, sessionExpired, disconnect }    = useYahooStatus();
   const { leagues, loading: leaguesLoading, error: leaguesError }           = useYahooLeagues(connected, sessionExpired);
-  const [selectedLeague, setSelectedLeague]                                  = useState<string>('');
 
   // Smart roster — real Yahoo data if available, mock as fallback
   const roster = useRoster(connected, sessionExpired, selectedLeague);
@@ -218,7 +219,7 @@ const TeamOverview = ({ onNavigate }: Props) => {
                 <Select
                   value={selectedLeague}
                   label="Select League"
-                  onChange={(e) => setSelectedLeague(e.target.value)}
+                  onChange={(e) => onChangeLeague(e.target.value)}
                 >
                   {leagues.map((league) => (
                     <MenuItem key={league.league_key} value={league.league_key}>

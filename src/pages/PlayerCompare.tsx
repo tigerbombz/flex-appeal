@@ -304,7 +304,7 @@ const PlayerCompare = () => {
               md: getGridColumns(sortedPlayers.length),
             },
             gap: 2,
-            alignItems: 'start',
+            alignItems: 'stretch',
           }}
         >
           {sortedPlayers.map((player, index) => (

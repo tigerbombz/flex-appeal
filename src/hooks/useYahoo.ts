@@ -1,20 +1,22 @@
 import { useState, useEffect } from 'react';
 import { yahooApi } from '../services/api';
+import { useAuthContext } from '../context/AuthContext';
 
 export interface YahooLeague {
-  league_key: string;
-  league_id: string;
-  name: string;
-  season: string;
-  num_teams: number;
-  scoring_type: string;
-  current_week: number;
+  league_key:    string;
+  league_id:     string;
+  name:          string;
+  season:        string;
+  num_teams:     number;
+  scoring_type:  string;
+  current_week:  number;
 }
 
 export const useYahooStatus = () => {
-  const [connected, setConnected] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [connected, setConnected]       = useState(false);
+  const [loading, setLoading]           = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const { logout } = useAuthContext();
 
   useEffect(() => {
     const check = async () => {
@@ -47,7 +49,6 @@ export const useYahooStatus = () => {
               setConnected(true);
               setSessionExpired(false);
             } else {
-              // Backend lost token — show session expired
               setConnected(true);
               setSessionExpired(true);
             }
@@ -74,6 +75,7 @@ export const useYahooStatus = () => {
     localStorage.removeItem('yahoo_session_expired');
     setConnected(false);
     setSessionExpired(false);
+    logout(); // clears auth context → returns to landing page in production
   };
 
   return { connected, loading, sessionExpired, disconnect };
@@ -82,7 +84,7 @@ export const useYahooStatus = () => {
 export const useYahooLeagues = (connected: boolean, sessionExpired: boolean) => {
   const [leagues, setLeagues] = useState<YahooLeague[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
     if (!connected || sessionExpired) return;
@@ -94,9 +96,11 @@ export const useYahooLeagues = (connected: boolean, sessionExpired: boolean) => 
         const data = await yahooApi.getLeagues();
         setLeagues(data.leagues);
       } catch (err: any) {
-        // Don't treat this as session expired
-        // Could be offseason with no leagues
-        setError('offseason');
+        if (err?.response?.status === 401) {
+          setError('session_expired');
+        } else {
+          setError('offseason');
+        }
         console.error(err);
       } finally {
         setLoading(false);

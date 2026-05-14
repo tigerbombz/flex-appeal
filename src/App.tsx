@@ -1,5 +1,13 @@
-import { useState } from 'react';
-import { Box, BottomNavigation, BottomNavigationAction, Paper, useMediaQuery, useTheme, CircularProgress } from '@mui/material';
+import { useState, useEffect } from 'react';
+import {
+  Box,
+  BottomNavigation,
+  BottomNavigationAction,
+  Paper,
+  useMediaQuery,
+  useTheme,
+  CircularProgress,
+} from '@mui/material';
 import SportsFootballIcon from '@mui/icons-material/SportsFootball';
 import BoltIcon from '@mui/icons-material/Bolt';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
@@ -10,25 +18,62 @@ import LineupEval from './pages/LineupEval';
 import PlayerCompare from './pages/PlayerCompare';
 import Settings from './pages/Settings';
 import Landing from './pages/Landing';
+import LeagueSelector from './components/LeagueSelector';
 import { useAuthContext } from './context/AuthContext';
+import { useYahooLeagues } from './hooks/useYahoo';
+import type { ScoringFormat } from './utils/scoring';
 
-const ACTIVE_TAB_KEY  = 'snapdecision_active_tab';
-const AUTH_ENABLED    = import.meta.env.VITE_AUTH_ENABLED === 'true';
+const ACTIVE_TAB_KEY     = 'snapdecision_active_tab';
+const LEAGUE_KEY_KEY     = 'snapdecision_league_key';
+const ONBOARDED_KEY      = 'snapdecision_onboarded';
+const AUTH_ENABLED       = import.meta.env.VITE_AUTH_ENABLED === 'true';
 
 const App = () => {
   const [tab, setTab] = useState<number>(
     parseInt(localStorage.getItem(ACTIVE_TAB_KEY) || '0')
   );
-  const theme         = useTheme();
-  const isDesktop     = useMediaQuery(theme.breakpoints.up('md'));
-  const { user, checked } = useAuthContext();
+  const [selectedLeague, setSelectedLeague] = useState<string>(
+    localStorage.getItem(LEAGUE_KEY_KEY) || ''
+  );
+  const [showLeagueSelector, setShowLeagueSelector] = useState(false);
+
+  const theme     = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const { user, loading, checked, logout } = useAuthContext();
+
+  const isConnected   = !!user;
+  const { leagues, loading: leaguesLoading } = useYahooLeagues(
+    isConnected,
+    false
+  );
+
+  // Show league selector after first login
+  useEffect(() => {
+    if (!user) return;
+    const onboarded = localStorage.getItem(ONBOARDED_KEY) === 'true';
+    if (!onboarded) {
+      setShowLeagueSelector(true);
+    }
+  }, [user]);
 
   const handleTabChange = (newTab: number) => {
     localStorage.setItem(ACTIVE_TAB_KEY, String(newTab));
     setTab(newTab);
   };
 
-  // Show spinner while checking auth
+  const handleLeagueSelect = (leagueKey: string, scoringFormat: ScoringFormat) => {
+    localStorage.setItem(LEAGUE_KEY_KEY, leagueKey);
+    localStorage.setItem(ONBOARDED_KEY, 'true');
+    setSelectedLeague(leagueKey);
+    setShowLeagueSelector(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem(ONBOARDED_KEY);
+    localStorage.removeItem(LEAGUE_KEY_KEY);
+    logout();
+  };
+
   if (AUTH_ENABLED && !checked) {
     return (
       <Box sx={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -37,7 +82,6 @@ const App = () => {
     );
   }
 
-  // Show landing page if auth is enabled and user is not logged in
   if (AUTH_ENABLED && !user) {
     return <Landing />;
   }
@@ -52,13 +96,30 @@ const App = () => {
         px: isDesktop ? 4 : 0,
       }}
     >
+      {/* League selector modal — shown after first login */}
+      <LeagueSelector
+        open={showLeagueSelector}
+        leagues={leagues}
+        loading={leaguesLoading}
+        onSelect={handleLeagueSelect}
+      />
+
       <AppHeader onSettingsClick={() => handleTabChange(3)} />
 
       <Box>
-        {tab === 0 && <TeamOverview onNavigate={handleTabChange} />}
+        {tab === 0 && (
+          <TeamOverview
+            onNavigate={handleTabChange}
+            selectedLeague={selectedLeague}
+            onChangeLeague={(key) => {
+              localStorage.setItem(LEAGUE_KEY_KEY, key);
+              setSelectedLeague(key);
+            }}
+          />
+        )}
         {tab === 1 && <LineupEval />}
         {tab === 2 && <PlayerCompare />}
-        {tab === 3 && <Settings />}
+        {tab === 3 && <Settings onLogout={handleLogout} />}
       </Box>
 
       <Paper

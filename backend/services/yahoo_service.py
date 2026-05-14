@@ -204,13 +204,14 @@ async def get_user_leagues(yahoo_id: str, db=None) -> list:
             for j in range(league_count):
                 league = league_data[str(j)]["league"][0]
                 leagues.append({
-                    "league_key":   league.get("league_key"),
-                    "league_id":    league.get("league_id"),
-                    "name":         league.get("name"),
-                    "season":       league.get("season"),
-                    "num_teams":    league.get("num_teams"),
-                    "scoring_type": league.get("scoring_type"),
-                    "current_week": league.get("current_week"),
+                    "league_key":      league.get("league_key"),
+                    "league_id":       league.get("league_id"),
+                    "name":            league.get("name"),
+                    "season":          league.get("season"),
+                    "num_teams":       league.get("num_teams"),
+                    "scoring_type":    league.get("scoring_type"),
+                    "scoring_format":  normalize_scoring_format(league.get("scoring_type", "head")),
+                    "current_week":    league.get("current_week"),
                 })
 
         return leagues
@@ -282,3 +283,15 @@ async def get_roster(league_key: str, team_key: str, yahoo_id: str, db=None) -> 
         return players
     except Exception as e:
         raise Exception(f"Failed to parse roster: {str(e)}")
+    
+def normalize_scoring_format(yahoo_scoring_type: str) -> str:
+    """Convert Yahoo scoring type to our format"""
+    mapping = {
+        "headppr":  "PPR",
+        "headhalf": "Half",
+        "head":     "Standard",
+        "ppr":      "PPR",
+        "half":     "Half",
+        "standard": "Standard",
+    }
+    return mapping.get(yahoo_scoring_type.lower(), "PPR")

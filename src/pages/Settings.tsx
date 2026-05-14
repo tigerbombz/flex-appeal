@@ -23,7 +23,11 @@ import ModeSelector from '../components/ModeSelector';
 import { useSettings } from '../context/SettingsContext';
 import type { ScoringFormat } from '../utils/scoring';
 
-const Settings = () => {
+interface Props {
+  onLogout: () => void;
+}
+
+const Settings = ({ onLogout }: Props ) => {
   const { scoringFormat, scoringMode, setScoringFormat, setScoringMode } = useSettings();
   const [notifications, setNotifications] = useState(
     localStorage.getItem('snapdecision_notifications') === 'true'
@@ -31,7 +35,7 @@ const Settings = () => {
   const [saved, setSaved] = useState(false);
   const [backtestSummary, setBacktestSummary] = useState<any>(null);
 
-  const { connected, loading: yahooLoading, sessionExpired, disconnect } = useYahooStatus();
+  const { connected, loading: yahooLoading, sessionExpired } = useYahooStatus();
   const { leagues } = useYahooLeagues(connected, sessionExpired);
 
   useEffect(() => {
@@ -128,7 +132,7 @@ const Settings = () => {
               </Button>
               <Button
                 size="small"
-                onClick={disconnect}
+                onClick={onLogout}
                 sx={{ color: 'text.secondary', fontSize: 11 }}
               >
                 Disconnect
@@ -149,7 +153,7 @@ const Settings = () => {
               <Button
                 size="small"
                 startIcon={<LinkOffIcon />}
-                onClick={disconnect}
+                onClick={onLogout}
                 sx={{ color: 'text.secondary', fontSize: 11 }}
               >
                 Disconnect
