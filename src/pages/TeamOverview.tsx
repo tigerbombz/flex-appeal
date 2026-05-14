@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -40,7 +39,7 @@ const TeamOverview = ({ onNavigate, selectedLeague, onChangeLeague }: Props) => 
 
   const { events, loading: eventsLoading, error: eventsError, lastUpdated } = useNflEvents();
   const { connected, loading: yahooLoading, sessionExpired, disconnect }    = useYahooStatus();
-  const { leagues, loading: leaguesLoading, error: leaguesError }           = useYahooLeagues(connected, sessionExpired);
+  const { leagues, loading: leaguesLoading }           = useYahooLeagues(connected, sessionExpired);
 
   // Smart roster — real Yahoo data if available, mock as fallback
   const roster = useRoster(connected, sessionExpired, selectedLeague);

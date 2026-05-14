@@ -21,7 +21,6 @@ import Landing from './pages/Landing';
 import LeagueSelector from './components/LeagueSelector';
 import { useAuthContext } from './context/AuthContext';
 import { useYahooLeagues } from './hooks/useYahoo';
-import type { ScoringFormat } from './utils/scoring';
 
 const ACTIVE_TAB_KEY     = 'snapdecision_active_tab';
 const LEAGUE_KEY_KEY     = 'snapdecision_league_key';
@@ -39,7 +38,7 @@ const App = () => {
 
   const theme     = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
-  const { user, loading, checked, logout } = useAuthContext();
+  const { user, checked, logout } = useAuthContext();
 
   const isConnected   = !!user;
   const { leagues, loading: leaguesLoading } = useYahooLeagues(
@@ -61,7 +60,7 @@ const App = () => {
     setTab(newTab);
   };
 
-  const handleLeagueSelect = (leagueKey: string, scoringFormat: ScoringFormat) => {
+  const handleLeagueSelect = (leagueKey: string) => {
     localStorage.setItem(LEAGUE_KEY_KEY, leagueKey);
     localStorage.setItem(ONBOARDED_KEY, 'true');
     setSelectedLeague(leagueKey);
