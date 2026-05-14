@@ -27,12 +27,12 @@ interface Props {
   onLogout: () => void;
 }
 
-const Settings = ({ onLogout }: Props ) => {
+const Settings = ({ onLogout }: Props) => {
   const { scoringFormat, scoringMode, setScoringFormat, setScoringMode } = useSettings();
   const [notifications, setNotifications] = useState(
     localStorage.getItem('snapdecision_notifications') === 'true'
   );
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved]                 = useState(false);
   const [backtestSummary, setBacktestSummary] = useState<any>(null);
 
   const { connected, loading: yahooLoading, sessionExpired } = useYahooStatus();
@@ -74,12 +74,12 @@ const Settings = ({ onLogout }: Props ) => {
       </Typography>
       <Box
         sx={{
-          bgcolor: 'background.paper',
-          border: '1px solid',
+          bgcolor:     'background.paper',
+          border:      '1px solid',
           borderColor: connected && !sessionExpired ? '#22c55e40' : 'divider',
           borderRadius: 3,
-          p: 2,
-          mb: 3,
+          p:           2,
+          mb:          3,
         }}
       >
         {yahooLoading && (
@@ -135,7 +135,7 @@ const Settings = ({ onLogout }: Props ) => {
                 onClick={onLogout}
                 sx={{ color: 'text.secondary', fontSize: 11 }}
               >
-                Disconnect
+                Sign Out
               </Button>
             </Box>
           </Box>
@@ -156,7 +156,7 @@ const Settings = ({ onLogout }: Props ) => {
                 onClick={onLogout}
                 sx={{ color: 'text.secondary', fontSize: 11 }}
               >
-                Disconnect
+                Sign Out
               </Button>
             </Box>
 
@@ -170,13 +170,13 @@ const Settings = ({ onLogout }: Props ) => {
                     <Box
                       key={league.league_key}
                       sx={{
-                        bgcolor: 'background.default',
+                        bgcolor:      'background.default',
                         borderRadius: 2,
-                        px: 1.5,
-                        py: 1,
-                        display: 'flex',
+                        px:           1.5,
+                        py:           1,
+                        display:      'flex',
                         justifyContent: 'space-between',
-                        alignItems: 'center',
+                        alignItems:   'center',
                       }}
                     >
                       <Box>
@@ -188,7 +188,7 @@ const Settings = ({ onLogout }: Props ) => {
                         </Typography>
                       </Box>
                       <Chip
-                        label={league.scoring_type?.toUpperCase() || 'PPR'}
+                        label={(league as any).scoring_format?.toUpperCase() || 'PPR'}
                         size="small"
                         sx={{ fontSize: 10, height: 20, bgcolor: 'primary.main', color: '#000', fontWeight: 700 }}
                       />
@@ -216,15 +216,15 @@ const Settings = ({ onLogout }: Props ) => {
 
       <Box
         sx={{
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
+          bgcolor:      'background.paper',
+          border:       '1px solid',
+          borderColor:  'divider',
           borderRadius: 3,
-          p: 2,
-          mb: 3,
-          display: 'flex',
+          p:            2,
+          mb:           3,
+          display:      'flex',
           flexDirection: 'column',
-          gap: 2.5,
+          gap:          2.5,
         }}
       >
         <Box>
@@ -275,12 +275,12 @@ const Settings = ({ onLogout }: Props ) => {
 
       <Box
         sx={{
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
+          bgcolor:      'background.paper',
+          border:       '1px solid',
+          borderColor:  'divider',
           borderRadius: 3,
-          p: 2,
-          mb: 3,
+          p:            2,
+          mb:           3,
         }}
       >
         <FormControlLabel
@@ -314,12 +314,12 @@ const Settings = ({ onLogout }: Props ) => {
 
       <Box
         sx={{
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
+          bgcolor:      'background.paper',
+          border:       '1px solid',
+          borderColor:  'divider',
           borderRadius: 3,
-          p: 2,
-          mb: 3,
+          p:            2,
+          mb:           3,
         }}
       >
         {backtestSummary ? (
@@ -379,15 +379,15 @@ const Settings = ({ onLogout }: Props ) => {
 
       <Box
         sx={{
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
+          bgcolor:      'background.paper',
+          border:       '1px solid',
+          borderColor:  'divider',
           borderRadius: 3,
-          p: 2,
-          mb: 3,
-          display: 'flex',
+          p:            2,
+          mb:           3,
+          display:      'flex',
           flexDirection: 'column',
-          gap: 1,
+          gap:          1,
         }}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
