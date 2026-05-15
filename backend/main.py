@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import odds, scoring, sleeper, yahoo, lineup, backtest
+from routers import odds, scoring, sleeper, yahoo, lineup, backtest, stats
 from database import init_db
 import os
 
@@ -26,6 +26,7 @@ app.include_router(sleeper.router)
 app.include_router(yahoo.router)
 app.include_router(lineup.router)
 app.include_router(backtest.router)
+app.include_router(stats.router)
 
 @app.on_event("startup")
 async def startup():

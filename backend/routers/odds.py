@@ -4,33 +4,40 @@ from datetime import datetime, timezone, timedelta
 
 router = APIRouter(prefix="/api/odds", tags=["odds"])
 
-def filter_upcoming_games(events: list) -> list:
-    """Only return games within the next 7 days"""
+def filter_upcoming_games(events: list, days_ahead: int = 14) -> list:
+    """
+    Return games within the next N days.
+    Default 14 days to catch games that have early lines.
+    """
     now      = datetime.now(timezone.utc)
-    one_week = now + timedelta(days=7)
+    cutoff   = now + timedelta(days=days_ahead)
     filtered = []
     for event in events:
         try:
             commence = datetime.fromisoformat(
                 event["commence_time"].replace("Z", "+00:00")
             )
-            if now <= commence <= one_week:
+            if now <= commence <= cutoff:
                 filtered.append(event)
         except Exception:
             continue
     return filtered
 
 @router.get("/events")
-async def fetch_nfl_events():
-    """Get upcoming NFL games within the next 7 days"""
+async def fetch_nfl_events(days_ahead: int = 14):
+    """
+    Get upcoming NFL games.
+    days_ahead parameter lets you look further out.
+    """
     try:
-        events   = await get_nfl_events()
-        filtered = filter_upcoming_games(events)
+        events          = await get_nfl_events()
+        filtered        = filter_upcoming_games(events, days_ahead)
         return {
-            "events":       filtered,
-            "last_updated": datetime.now(timezone.utc).isoformat(),
-            "count":        len(filtered),
+            "events":          filtered,
+            "last_updated":    datetime.now(timezone.utc).isoformat(),
+            "count":           len(filtered),
             "total_available": len(events),
+            "days_ahead":      days_ahead,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -52,7 +59,7 @@ async def fetch_team_totals():
         return {
             "games":        games,
             "last_updated": datetime.now(timezone.utc).isoformat(),
-            "count":        len(games)
+            "count":        len(games),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -64,7 +71,7 @@ async def fetch_player_props(event_id: str):
         data = await get_player_props(event_id)
         return {
             "props":        data,
-            "last_updated": datetime.now(timezone.utc).isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -76,5 +83,5 @@ async def odds_health():
     key = os.getenv("ODDS_API_KEY")
     return {
         "configured":  key is not None,
-        "key_preview": f"{key[:4]}..." if key else None
+        "key_preview": f"{key[:4]}..." if key else None,
     }

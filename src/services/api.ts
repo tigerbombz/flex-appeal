@@ -139,4 +139,59 @@ export const backtestApi = {
   },
 };
 
+export const statsApi = {
+  getCurrentSeason: async () => {
+    const res = await api.get('/api/stats/current-season');
+    return res.data;
+  },
+
+  getPointsLastThree: async (
+    playerId:    string,
+    season:      string,
+    currentWeek: number,
+    scoring:     string = 'PPR'
+  ) => {
+    const res = await api.post('/api/stats/points-last-three', {
+      player_id:    playerId,
+      season,
+      current_week: currentWeek,
+      scoring,
+    });
+    return res.data;
+  },
+
+  getBulkPointsLastThree: async (
+    playerIds:   string[],
+    season:      string,
+    currentWeek: number,
+    scoring:     string = 'PPR'
+  ) => {
+    const res = await api.post('/api/stats/points-last-three/bulk', {
+      player_ids:   playerIds,
+      season,
+      current_week: currentWeek,
+      scoring,
+    });
+    return res.data;
+  },
+
+  getWeekStats: async (season: string, week: number) => {
+    const res = await api.get(`/api/stats/week/${season}/${week}`);
+    return res.data;
+  },
+
+  getTopPerformers: async (
+    season:   string,
+    week:     number,
+    position: string,
+    scoring:  string = 'PPR',
+    limit:    number = 20
+  ) => {
+    const res = await api.get(
+      `/api/stats/top/${season}/${week}/${position}?scoring=${scoring}&limit=${limit}`
+    );
+    return res.data;
+  },
+};
+
 export default api;

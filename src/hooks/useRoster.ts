@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { yahooApi } from '../services/api';
+import { yahooApi, statsApi } from '../services/api';
 import { mockRoster, mockLeague } from '../data/mockData';
 import type { Player } from '../types/index';
 
@@ -14,7 +14,6 @@ export interface RosterState {
   week:          number;
 }
 
-// Convert Yahoo roster player to our Player shape with defaults
 const yahooPlayerToPlayer = (p: any, index: number): Player => ({
   id:                 index + 1000,
   name:               p.name        || 'Unknown',
@@ -48,10 +47,40 @@ const yahooPlayerToPlayer = (p: any, index: number): Player => ({
   pointsLastThree:    [],
 });
 
+async function enrichWithStats(
+  players: Player[],
+  season: string,
+  week: number,
+  scoring: string,
+): Promise<Player[]> {
+  if (week <= 0) return players;
+
+  try {
+    const playerIds = players.map((p) => String(p.id));
+    const data      = await statsApi.getBulkPointsLastThree(
+      playerIds,
+      season,
+      week,
+      scoring,
+    );
+
+    return players.map((player) => {
+      const stats = data.results?.[String(player.id)];
+      if (stats?.points_last_three?.length) {
+        return { ...player, pointsLastThree: stats.points_last_three };
+      }
+      return player;
+    });
+  } catch {
+    return players;
+  }
+}
+
 export const useRoster = (
-  connected: boolean,
-  sessionExpired: boolean,
+  connected:         boolean,
+  sessionExpired:    boolean,
   selectedLeagueKey: string,
+  scoringFormat:     string = 'PPR',
 ) => {
   const [state, setState] = useState<RosterState>({
     starters:      mockRoster.starters,
@@ -65,7 +94,6 @@ export const useRoster = (
   });
 
   useEffect(() => {
-    // No league selected or not connected — use mock data
     if (!connected || sessionExpired || !selectedLeagueKey) {
       setState((prev) => ({
         ...prev,
@@ -82,24 +110,40 @@ export const useRoster = (
     }
 
     const fetchRealRoster = async () => {
+    // Get current season from backend
+    let season      = '2025';
+    let currentWeek = 0;
+    try {
+        const seasonInfo = await statsApi.getCurrentSeason();
+        season           = seasonInfo.season;
+        currentWeek      = seasonInfo.current_week;
+    } catch {
+        console.log('Could not fetch season info — using defaults');
+    }
       try {
         setState((prev) => ({ ...prev, loading: true, error: null }));
 
-        // Get the user's team in this league
         const teamData = await yahooApi.getMyTeam(selectedLeagueKey);
         if (!teamData.team) throw new Error('Could not find your team');
 
-        const teamKey = teamData.team.team_key;
-
-        // Get the full roster
+        const teamKey    = teamData.team.team_key;
         const rosterData = await yahooApi.getRoster(selectedLeagueKey, teamKey);
         if (!rosterData.players?.length) throw new Error('No players found');
 
-        const allPlayers: Player[] = rosterData.players.map(
+        const currentWeek = mockLeague.week;
+
+        let allPlayers: Player[] = rosterData.players.map(
           (p: any, i: number) => yahooPlayerToPlayer(p, i)
         );
 
-        // Split into starters and bench based on slot
+        // Enrich with real stats when in season
+        allPlayers = await enrichWithStats(
+          allPlayers,
+          '2025',
+          currentWeek,
+          scoringFormat,
+        );
+
         const starters = allPlayers.filter((p) =>
           !['BN', 'IR', 'NA'].includes(p.slot)
         );
@@ -114,13 +158,12 @@ export const useRoster = (
           loading:       false,
           error:         null,
           leagueName:    teamData.team.name || 'My Team',
-          scoringFormat: 'PPR',
-          week:          mockLeague.week,
+          scoringFormat,
+          week:          currentWeek,
         });
 
       } catch (err: any) {
         console.error('Failed to fetch real roster:', err);
-        // Fall back to mock data gracefully
         setState({
           starters:      mockRoster.starters,
           bench:         mockRoster.bench,
@@ -135,7 +178,7 @@ export const useRoster = (
     };
 
     fetchRealRoster();
-  }, [connected, sessionExpired, selectedLeagueKey]);
+  }, [connected, sessionExpired, selectedLeagueKey, scoringFormat]);
 
   return state;
 };
