@@ -4,13 +4,13 @@ from datetime import datetime, timezone, timedelta
 
 router = APIRouter(prefix="/api/odds", tags=["odds"])
 
-def filter_upcoming_games(events: list, days_ahead: int = 14) -> list:
+def filter_upcoming_games(events: list, days_ahead: int = 60) -> list:
     """
     Return games within the next N days.
-    Default 14 days to catch games that have early lines.
+    Default 60 days to catch preseason and early season games.
     """
-    now      = datetime.now(timezone.utc)
-    cutoff   = now + timedelta(days=days_ahead)
+    now    = datetime.now(timezone.utc)
+    cutoff = now + timedelta(days=days_ahead)
     filtered = []
     for event in events:
         try:
@@ -24,14 +24,11 @@ def filter_upcoming_games(events: list, days_ahead: int = 14) -> list:
     return filtered
 
 @router.get("/events")
-async def fetch_nfl_events(days_ahead: int = 14):
-    """
-    Get upcoming NFL games.
-    days_ahead parameter lets you look further out.
-    """
+async def fetch_nfl_events(days_ahead: int = 60):
+    """Get upcoming NFL games within the next N days"""
     try:
-        events          = await get_nfl_events()
-        filtered        = filter_upcoming_games(events, days_ahead)
+        events   = await get_nfl_events()
+        filtered = filter_upcoming_games(events, days_ahead)
         return {
             "events":          filtered,
             "last_updated":    datetime.now(timezone.utc).isoformat(),

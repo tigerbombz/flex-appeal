@@ -16,10 +16,10 @@ export interface RosterState {
 
 const yahooPlayerToPlayer = (p: any, index: number): Player => ({
   id:                 index + 1000,
-  name:               p.name        || 'Unknown',
-  position:           p.position    || 'WR',
-  slot:               p.slot        || p.position || 'BN',
-  team:               p.team        || 'NFL',
+  name:               p.name     || 'Unknown',
+  position:           p.position || 'WR',
+  slot:               p.slot     || p.position || 'BN',
+  team:               p.team     || 'NFL',
   opponent:           'TBD',
   passingYardsProp:   null,
   rushingYardsProp:   null,
@@ -48,10 +48,10 @@ const yahooPlayerToPlayer = (p: any, index: number): Player => ({
 });
 
 async function enrichWithStats(
-  players: Player[],
-  season: string,
-  week: number,
-  scoring: string,
+  players:      Player[],
+  season:       string,
+  week:         number,
+  scoring:      string,
 ): Promise<Player[]> {
   if (week <= 0) return players;
 
@@ -110,27 +110,27 @@ export const useRoster = (
     }
 
     const fetchRealRoster = async () => {
-    // Get current season from backend
-    let season      = '2025';
-    let currentWeek = 0;
-    try {
-        const seasonInfo = await statsApi.getCurrentSeason();
-        season           = seasonInfo.season;
-        currentWeek      = seasonInfo.current_week;
-    } catch {
-        console.log('Could not fetch season info — using defaults');
-    }
       try {
         setState((prev) => ({ ...prev, loading: true, error: null }));
 
+        // Get current season info from backend
+        let activeSeason = '2025';
+        let activeWeek   = 0;
+        try {
+          const seasonInfo = await statsApi.getCurrentSeason();
+          activeSeason     = seasonInfo.season;
+          activeWeek       = seasonInfo.current_week;
+        } catch {
+          console.log('Could not fetch season info — using defaults');
+        }
+
+        // Get the user's team in this league
         const teamData = await yahooApi.getMyTeam(selectedLeagueKey);
         if (!teamData.team) throw new Error('Could not find your team');
 
         const teamKey    = teamData.team.team_key;
         const rosterData = await yahooApi.getRoster(selectedLeagueKey, teamKey);
         if (!rosterData.players?.length) throw new Error('No players found');
-
-        const currentWeek = mockLeague.week;
 
         let allPlayers: Player[] = rosterData.players.map(
           (p: any, i: number) => yahooPlayerToPlayer(p, i)
@@ -139,8 +139,8 @@ export const useRoster = (
         // Enrich with real stats when in season
         allPlayers = await enrichWithStats(
           allPlayers,
-          '2025',
-          currentWeek,
+          activeSeason,
+          activeWeek,
           scoringFormat,
         );
 
@@ -159,7 +159,7 @@ export const useRoster = (
           error:         null,
           leagueName:    teamData.team.name || 'My Team',
           scoringFormat,
-          week:          currentWeek,
+          week:          activeWeek || mockLeague.week,
         });
 
       } catch (err: any) {
