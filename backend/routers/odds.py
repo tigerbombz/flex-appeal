@@ -1,40 +1,18 @@
 from fastapi import APIRouter, HTTPException
 from services.odds_service import get_team_totals, get_nfl_events, get_player_props
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/odds", tags=["odds"])
 
-def filter_upcoming_games(events: list, days_ahead: int = 60) -> list:
-    """
-    Return games within the next N days.
-    Default 60 days to catch preseason and early season games.
-    """
-    now    = datetime.now(timezone.utc)
-    cutoff = now + timedelta(days=days_ahead)
-    filtered = []
-    for event in events:
-        try:
-            commence = datetime.fromisoformat(
-                event["commence_time"].replace("Z", "+00:00")
-            )
-            if now <= commence <= cutoff:
-                filtered.append(event)
-        except Exception:
-            continue
-    return filtered
-
 @router.get("/events")
-async def fetch_nfl_events(days_ahead: int = 60):
-    """Get upcoming NFL games within the next N days"""
+async def fetch_nfl_events():
+    """Get all available NFL games from The Odds API"""
     try:
-        events   = await get_nfl_events()
-        filtered = filter_upcoming_games(events, days_ahead)
+        events = await get_nfl_events()
         return {
-            "events":          filtered,
-            "last_updated":    datetime.now(timezone.utc).isoformat(),
-            "count":           len(filtered),
-            "total_available": len(events),
-            "days_ahead":      days_ahead,
+            "events":       events,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "count":        len(events),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

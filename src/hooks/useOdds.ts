@@ -2,24 +2,24 @@ import { useState, useEffect } from 'react';
 import { oddsApi } from '../services/api';
 
 export interface OddsEvent {
-  id: string;
-  home_team: string;
-  away_team: string;
-  commence_time: string;
+  id:             string;
+  home_team:      string;
+  away_team:      string;
+  commence_time:  string;
 }
 
 export interface GameTotal {
-  id: string;
-  home_team: string;
-  away_team: string;
-  commence_time: string;
-  bookmakers: any[];
+  id:             string;
+  home_team:      string;
+  away_team:      string;
+  commence_time:  string;
+  bookmakers:     any[];
 }
 
 export const useNflEvents = () => {
-  const [events, setEvents] = useState<OddsEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [events, setEvents]         = useState<OddsEvent[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,9 +43,9 @@ export const useNflEvents = () => {
 };
 
 export const useGameTotals = () => {
-  const [games, setGames] = useState<GameTotal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [games, setGames]           = useState<GameTotal[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   useEffect(() => {
