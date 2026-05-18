@@ -26,6 +26,8 @@ import { useNflEvents } from '../hooks/useOdds';
 import { useYahooStatus, useYahooLeagues } from '../hooks/useYahoo';
 import { useRoster } from '../hooks/useRoster';
 import { yahooApi } from '../services/api';
+import NflScheduleCarousel from '../components/NflScheduleCarousel';
+
 
 interface Props {
   onNavigate: (tab: number) => void;
@@ -37,7 +39,7 @@ const TeamOverview = ({ onNavigate, selectedLeague, onChangeLeague }: Props) => 
   const theme     = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
-  const { events, loading: eventsLoading, error: eventsError, lastUpdated } = useNflEvents();
+  const { weeks, loading: eventsLoading, error: eventsError, lastUpdated } = useNflEvents();
   const { connected, loading: yahooLoading, sessionExpired, disconnect }    = useYahooStatus();
   const { leagues, loading: leaguesLoading }           = useYahooLeagues(connected, sessionExpired);
 
@@ -379,74 +381,45 @@ const TeamOverview = ({ onNavigate, selectedLeague, onChangeLeague }: Props) => 
           </Box>
         </Box>
 
-        <Box>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
-            Upcoming NFL Games
-          </Typography>
+        {/* Upcoming NFL Games — carousel by week */}
+      <Box>
+        <Typography sx={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: 'text.secondary', textTransform: 'uppercase', mb: 1.5 }}>
+          NFL Schedule
+        </Typography>
 
-          {eventsError && (
-            <Alert severity="error" sx={{ mb: 2, fontSize: 13 }}>
-              {eventsError}
-            </Alert>
-          )}
+        {eventsError && (
+          <Alert severity="error" sx={{ mb: 2, fontSize: 13 }}>
+            {eventsError}
+          </Alert>
+        )}
 
-          {eventsLoading && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} variant="rounded" height={60} sx={{ borderRadius: 3 }} />
-              ))}
-            </Box>
-          )}
-
-          {!eventsLoading && !eventsError && events.length === 0 && (
-            <Box
-              sx={{
-                bgcolor: 'background.paper',
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 3,
-                p: 2,
-              }}
-            >
-              <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
-                No upcoming NFL games — check back when the season starts.
-              </Typography>
-            </Box>
-          )}
-
+        {eventsLoading && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            {!eventsLoading && events.map((event) => (
-              <Box
-                key={event.id}
-                sx={{
-                  bgcolor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 3,
-                  px: 2,
-                  py: 1.5,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <Box>
-                  <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
-                    {event.away_team} @ {event.home_team}
-                  </Typography>
-                  <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
-                    {new Date(event.commence_time).toLocaleDateString([], {
-                      weekday: 'short',
-                      month:   'short',
-                      day:     'numeric',
-                      hour:    '2-digit',
-                      minute:  '2-digit',
-                    })}
-                  </Typography>
-                </Box>
-              </Box>
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} variant="rounded" height={60} sx={{ borderRadius: 3 }} />
             ))}
           </Box>
+        )}
+
+        {!eventsLoading && weeks.length === 0 && (
+          <Box
+            sx={{
+              bgcolor: 'background.paper',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 3,
+              p: 2,
+            }}
+          >
+            <Typography sx={{ fontSize: 13, color: 'text.secondary' }}>
+              No upcoming NFL games available yet.
+            </Typography>
+          </Box>
+        )}
+
+        {!eventsLoading && weeks.length > 0 && (
+          <NflScheduleCarousel weeks={weeks} />
+        )}
         </Box>
       </Box>
 
