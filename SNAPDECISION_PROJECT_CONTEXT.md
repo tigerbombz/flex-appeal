@@ -19,8 +19,8 @@ Full-stack fantasy football decision support app.
 - LineupEval.tsx — slot-by-slot lineup evaluation with mode toggle
 - PlayerCompare.tsx — compare up to 5 players side by side grid
 - Settings.tsx — Yahoo status, scoring format/mode, engine accuracy, logout
-- TradeAnalyzer.tsx — AI trade evaluation via Claude API
-- WaiverAssistant.tsx — AI waiver recommendations via Claude API
+- TradeAnalyzer.tsx — AI trade evaluation via Claude API; real Yahoo roster via useRoster with mock fallback; pending trades banner auto-fetches open proposals when Yahoo connected; freeSolo autocomplete for hypothetical trades
+- WaiverAssistant.tsx — AI waiver recommendations via Claude API; real Yahoo roster via useRoster with mock fallback; Live/Mock badge on roster summary
 - Landing.tsx — sign in page shown when VITE_AUTH_ENABLED=true and not logged in
 
 ### Components
@@ -40,12 +40,12 @@ Full-stack fantasy football decision support app.
 
 ### Hooks
 - useAuth.ts — checks localStorage + backend /auth/yahoo/status
-- useRoster.ts — smart roster: real Yahoo data with mock fallback, Sleeper stats enrichment
+- useRoster.ts — smart roster: real Yahoo data with mock fallback, Sleeper stats enrichment; signature: useRoster(connected, sessionExpired, selectedLeagueKey, scoringFormat)
 - useScoring.ts — POST /api/scoring/score, returns scored players
 - useLineup.ts — POST /api/lineup/evaluate, week/season for backtest logging
 - usePlayers.ts — Sleeper player search via GET /api/players/nfl
 - useOdds.ts — GET /api/odds/events, returns weeks grouped by NFL week
-- useYahoo.ts — useYahooStatus (connected/sessionExpired/disconnect), useYahooLeagues
+- useYahoo.ts — useYahooStatus (returns { connected, loading, sessionExpired, disconnect }), useYahooLeagues
 - useStats.ts — enriches players with real pointsLastThree from Sleeper
 - useSettings (context) — global scoringFormat + scoringMode persisted to localStorage
 
@@ -65,6 +65,8 @@ Player interface has position-specific props:
 Single axios instance at VITE_API_URL. Exports:
 oddsApi, scoringApi, playerApi, lineupApi, yahooApi, backtestApi, statsApi, aiApi
 
+yahooApi methods: getStatus, getLeagues, getMyTeam, getRoster, connectUrl, getPendingTrades
+
 ### Data
 - mockData.ts — full mock dataset: 9 starters, 9 bench, nflPlayerPool, 13-week history
 - nflTeams.ts — all 32 NFL DST teams with dstToPlayer converter
@@ -80,23 +82,25 @@ oddsApi, scoringApi, playerApi, lineupApi, yahooApi, backtestApi, statsApi, aiAp
 
 ### Models
 - models/player.py — Pydantic: PlayerInput (all position-specific props), PlayerScore, enums
-- models/db_models.py — SQLAlchemy ORM: users, leagues, teams, roster_players, 
+- models/db_models.py — SQLAlchemy ORM: users, leagues, teams, roster_players,
   player_stats, lineup_evaluations, weekly_matchups
-- models/user_repository.py — DB ops: get_or_create_user, save_tokens, 
+- models/user_repository.py — DB ops: get_or_create_user, save_tokens,
   get_active_token, get_refresh_token, get_first_user
 
 ### Services
-- scoring_service.py — core engine: position weights, mode adjustments, 
+- scoring_service.py — core engine: position weights, mode adjustments,
   get_position_prop(), get_prop_score(), calc_base_score(), calc_adjusted_score(),
   calc_floor(), calc_ceiling(), build_explanation(), score_players()
 - lineup_service.py — SLOT_ELIGIBILITY map, evaluate_lineup(), evaluate_flex()
 - odds_service.py — Odds API: get_nfl_events() with spreads+totals, get_team_totals()
 - sleeper_service.py — Sleeper API (no key), in-memory cache, parse_sleeper_players()
-- yahoo_service.py — OAuth flow, token refresh, get_user_leagues(), get_roster()
+- yahoo_service.py — OAuth flow, token refresh, get_user_leagues(), get_roster(),
+  get_my_team(), get_pending_trades() — fetches open trade proposals for user's team,
+  returns [] gracefully on any error
 - backtest_service.py — log_lineup_evaluation(), log_actual_points(), get_backtest_summary()
-- stats_service.py — Sleeper stats: get_week_stats(), get_player_stats(), 
+- stats_service.py — Sleeper stats: get_week_stats(), get_player_stats(),
   calc_fantasy_points(), get_points_last_three()
-- ai_service.py — Claude API: rate limiter (MAX_AI_REQUESTS_PER_DAY), 
+- ai_service.py — Claude API: rate limiter (MAX_AI_REQUESTS_PER_DAY),
   build_roster_context(), analyze_trade(), analyze_waiver_wire()
 
 ### Routers
@@ -104,15 +108,17 @@ oddsApi, scoringApi, playerApi, lineupApi, yahooApi, backtestApi, statsApi, aiAp
 - routers/scoring.py — POST /api/scoring/score, /explain/{player_id}
 - routers/lineup.py — POST /api/lineup/evaluate (auto-logs to DB), /flex
 - routers/sleeper.py — GET /api/players/nfl, DELETE /api/players/nfl/cache
-- routers/yahoo.py — GET /auth/yahoo/login, /callback, /status, /leagues, 
-  /team/{key}, /roster/{league_key}/{team_key}
+- routers/yahoo.py — GET /auth/yahoo/login, /callback, /status, /leagues,
+  /team/{league_key}, /roster/{league_key}/{team_key},
+  /trades/pending (returns pending trade proposals for user's team, graceful [] fallback),
+  /debug
 - routers/backtest.py — GET /api/backtest/summary, POST /actual-points, GET /history
 - routers/stats.py — GET /api/stats/week/{season}/{week}, POST /points-last-three,
   POST /points-last-three/bulk, GET /top/{season}/{week}/{position}, GET /current-season
 - routers/ai.py — POST /api/ai/trade, POST /api/ai/waiver, GET /api/ai/status
 
 ### Utils
-- utils/season.py — get_current_season() (NFL year = year season starts), 
+- utils/season.py — get_current_season() (NFL year = year season starts),
   get_current_week() (0 if offseason)
 
 ### Environment Variables (Railway + local .env)
@@ -130,14 +136,14 @@ oddsApi, scoringApi, playerApi, lineupApi, yahooApi, backtestApi, statsApi, aiAp
 - teams — league_id FK, user_id FK, yahoo_team_key, wins, losses, points
 - roster_players — team_id FK, player data, week, season
 - player_stats — yahoo_player_key, week, season, points, props, usage stats
-- lineup_evaluations — team_id FK, week, slot, recommendation, scores, 
+- lineup_evaluations — team_id FK, week, slot, recommendation, scores,
   was_followed, actual_pts (for backtesting)
 - weekly_matchups — team_id FK, week, result, points_for, points_against
 
 ## Scoring Engine Details
-Position-specific weights: QB(teamTotal 35%, prop 25%, usage 20%), 
+Position-specific weights: QB(teamTotal 35%, prop 25%, usage 20%),
 RB(usage 30%, prop 30%, teamTotal 20%), WR(prop 35%, usage 25%, teamTotal 20%),
-TE(prop 35%, usage 30%, teamTotal 15%), K(teamTotal 35%, prop 40%), 
+TE(prop 35%, usage 30%, teamTotal 15%), K(teamTotal 35%, prop 40%),
 DST(matchup 40%, prop 40% inverted)
 
 Mode shifts weights ±10-15%. Format boosts: PPR WR+4/TE+3/RB+2.
@@ -148,8 +154,9 @@ Usage hierarchy: snapPct > targetShare×2.5 > carryShare×1.4 > label.
 ## Auth Flow
 VITE_AUTH_ENABLED=true → show Landing if no user.
 Yahoo OAuth → callback saves token to DB → redirect with ?yahoo_connected=true
-→ LeagueSelector Dialog on first login → picks league → scoring format 
+→ LeagueSelector Dialog on first login → picks league → scoring format
 auto-set from Yahoo → ONBOARDED_KEY set in localStorage.
+selected_league_key stored in localStorage after onboarding (used by TradeAnalyzer + WaiverAssistant to call useRoster).
 Logout clears localStorage + AuthContext → returns to Landing.
 
 ## Deployment
@@ -172,10 +179,17 @@ All phases complete:
 ✅ AI trade analyzer (Claude API)
 ✅ AI waiver wire assistant (Claude API)
 ✅ Settings with logout, format/mode, engine accuracy
+✅ Phase 9: TradeAnalyzer + WaiverAssistant wired to real Yahoo roster via useRoster
+✅ Pending trades auto-detection in TradeAnalyzer (GET /auth/yahoo/trades/pending)
+✅ freeSolo autocomplete in TradeAnalyzer for hypothetical trades
+✅ Live/Mock data badge in WaiverAssistant roster summary
+✅ Fixed duplicate key lint error on Autocomplete renderValue Chip
 
 ## Pending / Next Steps
-- Test AI endpoints end to end with real ANTHROPIC_API_KEY
-- When season starts: real Odds API props flow to scoring engine automatically
-- Phase 9: replace mock data in TradeAnalyzer/WaiverAssistant with real Yahoo roster
-- Backtest Phase 8: enter actual points weekly via POST /api/backtest/actual-points
-- Future: paywall for AI features, push notifications for lineup reminders
+- [ ] Test AI endpoints end to end with real ANTHROPIC_API_KEY in production
+- [ ] Test pending trades detection with a live Yahoo league that has an active trade proposal
+- [ ] Consider adding league_key + team_key columns to users table in DB for faster pending trades lookup (currently fetches live on each request if not stored)
+- [ ] Phase 9 follow-up: replace nflPlayerPool mock data in WaiverAssistant with real Sleeper free agent search so available players are pulled from actual waivers
+- [ ] When season starts: real Odds API props flow to scoring engine automatically
+- [ ] Backtest Phase 8: enter actual points weekly via POST /api/backtest/actual-points
+- [ ] Future: paywall for AI features, push notifications for lineup reminders
