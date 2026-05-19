@@ -194,4 +194,36 @@ export const statsApi = {
   },
 };
 
+export const aiApi = {
+  analyzeTrade: async (payload: {
+    starters:        any[];
+    bench:           any[];
+    giving_players:  any[];
+    getting_players: any[];
+    scoring_format:  string;
+    scoring_mode:    string;
+    user_notes?:     string;
+  }) => {
+    const res = await api.post('/api/ai/trade', payload);
+    return res.data;
+  },
+
+  analyzeWaiver: async (payload: {
+    starters:          any[];
+    bench:             any[];
+    available_players: any[];
+    scoring_format:    string;
+    scoring_mode:      string;
+    week:              number;
+  }) => {
+    const res = await api.post('/api/ai/waiver', payload);
+    return res.data;
+  },
+
+  getStatus: async () => {
+    const res = await api.get('/api/ai/status');
+    return res.data;
+  },
+};
+
 export default api;

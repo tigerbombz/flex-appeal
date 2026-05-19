@@ -18,6 +18,10 @@ import LineupEval from './pages/LineupEval';
 import PlayerCompare from './pages/PlayerCompare';
 import Settings from './pages/Settings';
 import Landing from './pages/Landing';
+import TradeAnalyzer  from './pages/TradeAnalyzer';
+import WaiverAssistant from './pages/WaiverAssistant';
+import SwapHorizIcon  from '@mui/icons-material/SwapHoriz';
+import PersonAddIcon  from '@mui/icons-material/PersonAdd';
 import LeagueSelector from './components/LeagueSelector';
 import { useAuthContext } from './context/AuthContext';
 import { useYahooLeagues } from './hooks/useYahoo';
@@ -118,7 +122,9 @@ const App = () => {
         )}
         {tab === 1 && <LineupEval />}
         {tab === 2 && <PlayerCompare />}
-        {tab === 3 && <Settings onLogout={handleLogout} />}
+        {tab === 3 && <TradeAnalyzer />}
+        {tab === 4 && <WaiverAssistant />}
+        {tab === 5 && <Settings onLogout={handleLogout} />}
       </Box>
 
       <Paper
@@ -135,6 +141,8 @@ const App = () => {
           <BottomNavigationAction label="My Team" icon={<SportsFootballIcon />} />
           <BottomNavigationAction label="Lineup" icon={<BoltIcon />} />
           <BottomNavigationAction label="Compare" icon={<CompareArrowsIcon />} />
+          <BottomNavigationAction label="Trade"   icon={<SwapHorizIcon />} />
+          <BottomNavigationAction label="Waivers" icon={<PersonAddIcon />} />
           <BottomNavigationAction label="Settings" icon={<SettingsIcon />} />
         </BottomNavigation>
       </Paper>
