@@ -6,7 +6,7 @@ from typing import Optional
 
 load_dotenv()
 
-YAHOO_CLIENT_ID    = os.getenv("YAHOO_CLIENT_ID")
+YAHOO_CLIENT_ID     = os.getenv("YAHOO_CLIENT_ID")
 YAHOO_CLIENT_SECRET = os.getenv("YAHOO_CLIENT_SECRET")
 YAHOO_REDIRECT_URI  = os.getenv("YAHOO_REDIRECT_URI")
 
@@ -204,14 +204,14 @@ async def get_user_leagues(yahoo_id: str, db=None) -> list:
             for j in range(league_count):
                 league = league_data[str(j)]["league"][0]
                 leagues.append({
-                    "league_key":      league.get("league_key"),
-                    "league_id":       league.get("league_id"),
-                    "name":            league.get("name"),
-                    "season":          league.get("season"),
-                    "num_teams":       league.get("num_teams"),
-                    "scoring_type":    league.get("scoring_type"),
-                    "scoring_format":  normalize_scoring_format(league.get("scoring_type", "head")),
-                    "current_week":    league.get("current_week"),
+                    "league_key":     league.get("league_key"),
+                    "league_id":      league.get("league_id"),
+                    "name":           league.get("name"),
+                    "season":         league.get("season"),
+                    "num_teams":      league.get("num_teams"),
+                    "scoring_type":   league.get("scoring_type"),
+                    "scoring_format": normalize_scoring_format(league.get("scoring_type", "head")),
+                    "current_week":   league.get("current_week"),
                 })
 
         return leagues
@@ -283,7 +283,94 @@ async def get_roster(league_key: str, team_key: str, yahoo_id: str, db=None) -> 
         return players
     except Exception as e:
         raise Exception(f"Failed to parse roster: {str(e)}")
-    
+
+async def get_pending_trades(league_key: str, team_key: str, yahoo_id: str, db=None) -> list:
+    """
+    Fetch pending trade proposals involving the user's team.
+    Returns a normalized list:
+      [{ proposer, status, giving: [{name, position, team, player_key}], getting: [...] }]
+    Returns [] gracefully on any error so the frontend never breaks.
+    """
+    try:
+        data = await yahoo_api_request(
+            f"league/{league_key}/transactions;types=pending_trade;team_key={team_key}",
+            yahoo_id,
+            db,
+        )
+
+        transactions = (
+            data.get("fantasy_content", {})
+                .get("league", [{}])[1]
+                .get("transactions", {})
+        )
+
+        trades = []
+        count  = int(transactions.get("count", 0))
+
+        for i in range(count):
+            txn  = transactions.get(str(i), {}).get("transaction", [{}])
+            meta = txn[0] if txn else {}
+
+            # players block is at index 1
+            players_block = {}
+            if len(txn) > 1:
+                players_block = txn[1].get("players", {})
+
+            proposer = meta.get("trader_team_name", "Opponent")
+            giving   = []
+            getting  = []
+
+            player_count = int(players_block.get("count", 0))
+            for j in range(player_count):
+                p_data     = players_block.get(str(j), {}).get("player", [])
+                p_meta     = p_data[0] if p_data else []
+                p_txn_data = {}
+                if len(p_data) > 1:
+                    txn_list   = p_data[1].get("transaction_data", [{}])
+                    p_txn_data = txn_list[0] if txn_list else {}
+
+                # Yahoo returns player meta as a flat list of dicts
+                name       = ""
+                position   = ""
+                team       = ""
+                player_key = ""
+                for item in p_meta:
+                    if isinstance(item, dict):
+                        name       = item.get("full_name", name)
+                        player_key = item.get("player_key", player_key)
+                        team       = item.get("editorial_team_abbr", team)
+                    if isinstance(item, list):
+                        for sub in item:
+                            if isinstance(sub, dict):
+                                position = sub.get("position", position) or position
+
+                # destination_team_key tells us which side this player lands on
+                dest_team_key = p_txn_data.get("destination_team_key", "")
+                player_entry  = {
+                    "name":       name,
+                    "position":   position,
+                    "team":       team.upper() if team else "",
+                    "player_key": player_key,
+                }
+
+                if dest_team_key == team_key:
+                    getting.append(player_entry)
+                else:
+                    giving.append(player_entry)
+
+            trades.append({
+                "proposer": proposer,
+                "status":   meta.get("status", "pending"),
+                "giving":   giving,
+                "getting":  getting,
+            })
+
+        return trades
+
+    except Exception as e:
+        print(f"get_pending_trades error (returning []): {e}")
+        return []
+
 def normalize_scoring_format(yahoo_scoring_type: str) -> str:
     """Convert Yahoo scoring type to our format"""
     mapping = {

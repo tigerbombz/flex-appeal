@@ -8,6 +8,7 @@ from services.yahoo_service import (
     get_user_leagues,
     get_roster,
     get_my_team,
+    get_pending_trades,
 )
 from models.user_repository import get_first_user, get_active_token
 import os
@@ -86,8 +87,8 @@ async def fetch_my_team(league_key: str, db: AsyncSession = Depends(get_db)):
 @router.get("/roster/{league_key}/{team_key}")
 async def fetch_roster(
     league_key: str,
-    team_key: str,
-    db: AsyncSession = Depends(get_db)
+    team_key:   str,
+    db:         AsyncSession = Depends(get_db),
 ):
     """Get roster for a specific team"""
     try:
@@ -101,6 +102,44 @@ async def fetch_roster(
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/trades/pending")
+async def fetch_pending_trades(db: AsyncSession = Depends(get_db)):
+    """
+    Get pending trade proposals for the user's active team.
+    Returns { trades: [] } gracefully if not connected or no pending trades.
+    """
+    try:
+        user = await get_first_user(db)
+        if not user or not user.yahoo_id:
+            return { "trades": [] }
+
+        # We need league_key and team_key — fetch the user's team from their selected league
+        # The league_key is stored on the user row from onboarding (league_key column)
+        league_key = getattr(user, "league_key", None)
+        team_key   = getattr(user, "team_key",   None)
+
+        # If not stored yet, try to look them up live
+        if not league_key or not team_key:
+            try:
+                leagues = await get_user_leagues(user.yahoo_id, db)
+                if not leagues:
+                    return { "trades": [] }
+                league_key = leagues[0]["league_key"]
+                team_data  = await get_my_team(league_key, user.yahoo_id, db)
+                team_key   = team_data.get("team_key")
+            except Exception:
+                return { "trades": [] }
+
+        if not league_key or not team_key:
+            return { "trades": [] }
+
+        trades = await get_pending_trades(league_key, team_key, user.yahoo_id, db)
+        return { "trades": trades }
+
+    except Exception as e:
+        print(f"fetch_pending_trades error: {e}")
+        return { "trades": [] }
 
 @router.get("/debug")
 async def debug_env():

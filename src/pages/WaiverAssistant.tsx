@@ -9,12 +9,13 @@ import {
   TextField,
   Autocomplete,
 } from '@mui/material';
-import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import { mockRoster, nflPlayerPool } from '../data/mockData';
-import { useSettings } from '../context/SettingsContext';
-import { aiApi } from '../services/api';
-import { mockLeague } from '../data/mockData';
-import type { Player } from '../types/index';
+import PersonAddIcon    from '@mui/icons-material/PersonAdd';
+import { mockRoster, nflPlayerPool, mockLeague } from '../data/mockData';
+import { useSettings }  from '../context/SettingsContext';
+import { useYahooStatus } from '../hooks/useYahoo';
+import { useRoster }    from '../hooks/useRoster';
+import { aiApi }        from '../services/api';
+import type { Player }  from '../types/index';
 
 const PRIORITY_COLORS: Record<string, string> = {
   high:   '#22c55e',
@@ -23,11 +24,29 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 const WaiverAssistant = () => {
-  const { scoringFormat, scoringMode } = useSettings();
-  const [available, setAvailable]      = useState<Player[]>(nflPlayerPool);
-  const [loading, setLoading]          = useState(false);
-  const [result, setResult]            = useState<any>(null);
-  const [error, setError]              = useState<string | null>(null);
+  const { scoringFormat, scoringMode }    = useSettings();
+  const { connected, sessionExpired }     = useYahooStatus();
+
+  // Pull selected league key from localStorage (set during onboarding)
+  const selectedLeagueKey = localStorage.getItem('selected_league_key') ?? '';
+
+  const {
+    starters:    rosterStarters,
+    bench:       rosterBench,
+    isRealData,
+    loading:     rosterLoading,
+    week,
+  } = useRoster(connected, sessionExpired, selectedLeagueKey, scoringFormat);
+
+  // Fall back to mock if real data not loaded yet
+  const starters = rosterStarters.length ? rosterStarters : mockRoster.starters;
+  const bench    = rosterBench.length    ? rosterBench    : mockRoster.bench;
+  const activeWeek = week ?? mockLeague.week;
+
+  const [available, setAvailable] = useState<Player[]>(nflPlayerPool);
+  const [loading, setLoading]     = useState(false);
+  const [result, setResult]       = useState<any>(null);
+  const [error, setError]         = useState<string | null>(null);
 
   const handleAnalyze = async () => {
     try {
@@ -36,11 +55,11 @@ const WaiverAssistant = () => {
       setResult(null);
 
       const payload = {
-        starters: mockRoster.starters.map((p) => ({
+        starters: starters.map((p) => ({
           name: p.name, position: p.position, team: p.team,
           slot: p.slot, score: p.score, volatility: p.volatility,
         })),
-        bench: mockRoster.bench.map((p) => ({
+        bench: bench.map((p) => ({
           name: p.name, position: p.position, team: p.team,
           slot: p.slot, score: p.score, volatility: p.volatility,
         })),
@@ -49,7 +68,7 @@ const WaiverAssistant = () => {
         })),
         scoring_format: scoringFormat,
         scoring_mode:   scoringMode,
-        week:           mockLeague.week,
+        week:           activeWeek,
       };
 
       const data = await aiApi.analyzeWaiver(payload);
@@ -70,33 +89,92 @@ const WaiverAssistant = () => {
           Waiver Assistant
         </Typography>
         <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 0.5 }}>
-          AI-powered waiver wire recommendations for Week {mockLeague.week}
+          AI-powered waiver wire recommendations for Week {activeWeek}
+          {rosterLoading && (
+            <CircularProgress size={10} sx={{ ml: 1, verticalAlign: 'middle' }} />
+          )}
         </Typography>
       </Box>
 
       {/* Roster summary */}
       <Box
         sx={{
-          bgcolor:      'background.paper',
-          border:       '1px solid',
-          borderColor:  'divider',
+          bgcolor:     'background.paper',
+          border:      '1px solid',
+          borderColor: 'divider',
           borderRadius: 3,
-          p:            2,
-          mb:           2,
+          p:           2,
+          mb:          2,
         }}
       >
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1, mb: 1 }}>
-          Your Roster
-        </Typography>
+        {/* Roster header row with live/mock badge */}
+        <Box
+          sx={{
+            display:        'flex',
+            justifyContent: 'space-between',
+            alignItems:     'center',
+            mb:             1,
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize:      12,
+              fontWeight:    700,
+              color:         'text.secondary',
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+            }}
+          >
+            Your Roster
+          </Typography>
+
+          {rosterLoading ? (
+            <Chip
+              label="Loading…"
+              size="small"
+              sx={{
+                fontSize:    10,
+                height:      18,
+                bgcolor:     'background.default',
+                color:       'text.secondary',
+              }}
+            />
+          ) : isRealData ? (
+            <Chip
+              label="Live from Yahoo"
+              size="small"
+              sx={{
+                fontSize:    10,
+                height:      18,
+                bgcolor:     '#22c55e20',
+                color:       '#22c55e',
+                border:      '1px solid #22c55e40',
+              }}
+            />
+          ) : (
+            <Chip
+              label="Mock data"
+              size="small"
+              sx={{
+                fontSize:    10,
+                height:      18,
+                bgcolor:     'background.default',
+                color:       'text.secondary',
+              }}
+            />
+          )}
+        </Box>
+
+        {/* Player chips */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-          {[...mockRoster.starters, ...mockRoster.bench].map((p) => (
+          {[...starters, ...bench].map((p) => (
             <Chip
               key={p.id}
               label={`${p.name} · ${p.position}`}
               size="small"
               sx={{
                 fontSize:    11,
-                bgcolor:     mockRoster.starters.find((s) => s.id === p.id)
+                bgcolor:     starters.find((s) => s.id === p.id)
                   ? 'background.default'
                   : '#ffffff10',
                 color:       'text.secondary',
@@ -110,7 +188,16 @@ const WaiverAssistant = () => {
 
       {/* Available players */}
       <Box sx={{ mb: 2 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1, mb: 1 }}>
+        <Typography
+          sx={{
+            fontSize:      12,
+            fontWeight:    700,
+            color:         'text.secondary',
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+            mb:            1,
+          }}
+        >
           Available on Waivers
         </Typography>
         <Autocomplete
@@ -122,7 +209,6 @@ const WaiverAssistant = () => {
           renderValue={(value, getItemProps) =>
             value.map((p, i) => (
               <Chip
-                key={p.id}
                 label={`${p.name} · ${p.position}`}
                 size="small"
                 {...getItemProps({ index: i })}
@@ -146,7 +232,11 @@ const WaiverAssistant = () => {
         variant="contained"
         fullWidth
         size="large"
-        startIcon={loading ? <CircularProgress size={18} sx={{ color: '#000' }} /> : <PersonAddIcon />}
+        startIcon={
+          loading
+            ? <CircularProgress size={18} sx={{ color: '#000' }} />
+            : <PersonAddIcon />
+        }
         onClick={handleAnalyze}
         disabled={loading || !available.length}
         sx={{ fontWeight: 700, py: 1.4, mb: 3 }}
@@ -167,15 +257,24 @@ const WaiverAssistant = () => {
           {/* Roster analysis */}
           <Box
             sx={{
-              bgcolor:      'background.paper',
-              border:       '1px solid',
-              borderColor:  'divider',
+              bgcolor:     'background.paper',
+              border:      '1px solid',
+              borderColor: 'divider',
               borderRadius: 3,
-              p:            2,
-              mb:           2,
+              p:           2,
+              mb:          2,
             }}
           >
-            <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'primary.main', textTransform: 'uppercase', letterSpacing: 1, mb: 0.75 }}>
+            <Typography
+              sx={{
+                fontSize:      11,
+                fontWeight:    700,
+                color:         'primary.main',
+                textTransform: 'uppercase',
+                letterSpacing: 1,
+                mb:            0.75,
+              }}
+            >
               Roster Analysis
             </Typography>
             <Typography sx={{ fontSize: 13, color: 'text.secondary', lineHeight: 1.6 }}>
@@ -199,7 +298,16 @@ const WaiverAssistant = () => {
           </Box>
 
           {/* Recommendations */}
-          <Typography sx={{ fontSize: 12, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1, mb: 1 }}>
+          <Typography
+            sx={{
+              fontSize:      12,
+              fontWeight:    700,
+              color:         'text.secondary',
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+              mb:            1,
+            }}
+          >
             Recommendations
           </Typography>
 
@@ -208,14 +316,21 @@ const WaiverAssistant = () => {
               <Box
                 key={i}
                 sx={{
-                  bgcolor:      'background.paper',
-                  border:       '1px solid',
-                  borderColor:  `${PRIORITY_COLORS[rec.priority]}40`,
+                  bgcolor:     'background.paper',
+                  border:      '1px solid',
+                  borderColor: `${PRIORITY_COLORS[rec.priority]}40`,
                   borderRadius: 3,
-                  p:            2,
+                  p:           2,
                 }}
               >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                <Box
+                  sx={{
+                    display:        'flex',
+                    justifyContent: 'space-between',
+                    alignItems:     'flex-start',
+                    mb:             1,
+                  }}
+                >
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
                       <Typography sx={{ fontWeight: 700, fontSize: 15 }}>
@@ -224,7 +339,12 @@ const WaiverAssistant = () => {
                       <Chip
                         label={rec.position}
                         size="small"
-                        sx={{ fontSize: 10, height: 18, bgcolor: 'background.default', color: 'text.secondary' }}
+                        sx={{
+                          fontSize:    10,
+                          height:      18,
+                          bgcolor:     'background.default',
+                          color:       'text.secondary',
+                        }}
                       />
                     </Box>
                     {rec.drop_player && (
@@ -258,14 +378,23 @@ const WaiverAssistant = () => {
           {result.weekly_tip && (
             <Box
               sx={{
-                bgcolor:      'background.paper',
-                border:       '1px solid',
-                borderColor:  'primary.main',
+                bgcolor:     'background.paper',
+                border:      '1px solid',
+                borderColor: 'primary.main',
                 borderRadius: 3,
-                p:            2,
+                p:           2,
               }}
             >
-              <Typography sx={{ fontSize: 11, fontWeight: 700, color: 'primary.main', textTransform: 'uppercase', letterSpacing: 1, mb: 0.75 }}>
+              <Typography
+                sx={{
+                  fontSize:      11,
+                  fontWeight:    700,
+                  color:         'primary.main',
+                  textTransform: 'uppercase',
+                  letterSpacing: 1,
+                  mb:            0.75,
+                }}
+              >
                 💡 Weekly Tip
               </Typography>
               <Typography sx={{ fontSize: 13, lineHeight: 1.6 }}>
@@ -274,7 +403,9 @@ const WaiverAssistant = () => {
             </Box>
           )}
 
-          <Typography sx={{ fontSize: 11, color: 'text.secondary', textAlign: 'center', mt: 2 }}>
+          <Typography
+            sx={{ fontSize: 11, color: 'text.secondary', textAlign: 'center', mt: 2 }}
+          >
             Powered by Claude AI · Always apply your own judgment
           </Typography>
         </Box>

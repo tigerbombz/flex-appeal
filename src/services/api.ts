@@ -123,6 +123,10 @@ export const yahooApi = {
     return res.data;
   },
   connectUrl: () => `${API_URL}/auth/yahoo/login`,
+  getPendingTrades: async () => {
+    const res = await api.get('/auth/yahoo/trades/pending');
+    return res.data;
+  },
 };
 
 export const backtestApi = {
