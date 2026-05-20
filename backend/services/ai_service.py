@@ -1,9 +1,10 @@
-import anthropic
 import os
+import json
+from anthropic import AsyncAnthropic
 from datetime import datetime, timezone
 from typing import Optional
 
-client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 # Simple in-memory rate limiter
 _request_counts: dict = {}
@@ -24,8 +25,8 @@ def check_rate_limit() -> bool:
     return True
 
 def build_roster_context(
-    starters: list[dict],
-    bench:    list[dict],
+    starters:       list[dict],
+    bench:          list[dict],
     scoring_format: str,
     scoring_mode:   str,
 ) -> str:
@@ -51,13 +52,13 @@ def build_roster_context(
     return "\n".join(lines)
 
 async def analyze_trade(
-    starters:       list[dict],
-    bench:          list[dict],
-    giving_players: list[dict],
+    starters:        list[dict],
+    bench:           list[dict],
+    giving_players:  list[dict],
     getting_players: list[dict],
-    scoring_format: str,
-    scoring_mode:   str,
-    user_notes:     Optional[str] = None,
+    scoring_format:  str,
+    scoring_mode:    str,
+    user_notes:      Optional[str] = None,
 ) -> dict:
     """
     Analyze a trade using Claude.
@@ -72,11 +73,11 @@ async def analyze_trade(
     roster_ctx = build_roster_context(starters, bench, scoring_format, scoring_mode)
 
     giving_str  = ", ".join([
-        f"{p.get('name')} ({p.get('position')}, Score:{p.get('score',50)})"
+        f"{p.get('name')} ({p.get('position')}, Score:{p.get('score', 50)})"
         for p in giving_players
     ])
     getting_str = ", ".join([
-        f"{p.get('name')} ({p.get('position')}, Score:{p.get('score',50)})"
+        f"{p.get('name')} ({p.get('position')}, Score:{p.get('score', 50)})"
         for p in getting_players
     ])
 
@@ -105,19 +106,20 @@ Analyze this trade and respond in this exact JSON format:
 Be direct and specific. Reference the actual player names and scores. Consider positional needs based on my roster."""
 
     try:
-        message = client.messages.create(
-            model      = "claude-sonnet-4-20250514",
+        message = await client.messages.create(
+            model      = "claude-haiku-4-5-20251001",
             max_tokens = 1024,
             messages   = [{ "role": "user", "content": prompt }]
         )
 
-        import json
         raw  = message.content[0].text
         # Strip markdown code blocks if present
         raw  = raw.replace("```json", "").replace("```", "").strip()
         data = json.loads(raw)
         return { "analysis": data, "limited": False }
 
+    except json.JSONDecodeError as e:
+        return { "error": f"Failed to parse Claude response as JSON: {str(e)}", "limited": False }
     except Exception as e:
         return { "error": str(e), "limited": False }
 
@@ -142,7 +144,7 @@ async def analyze_waiver_wire(
     roster_ctx = build_roster_context(starters, bench, scoring_format, scoring_mode)
 
     available_str = "\n".join([
-        f"  {p.get('name')} ({p.get('position')}, {p.get('team')}) Score:{p.get('score',50)}"
+        f"  {p.get('name')} ({p.get('position')}, {p.get('team')}) Score:{p.get('score', 50)}"
         for p in available_players[:20]  # cap at 20 to control tokens
     ])
 
@@ -174,17 +176,18 @@ Analyze my roster needs and recommend waiver wire pickups. Respond in this exact
 Give 2-4 recommendations. Be specific about who to drop. Reference my actual roster."""
 
     try:
-        message = client.messages.create(
-            model      = "claude-sonnet-4-20250514",
+        message = await client.messages.create(
+            model      = "claude-haiku-4-5-20251001",
             max_tokens = 1024,
             messages   = [{ "role": "user", "content": prompt }]
         )
 
-        import json
         raw  = message.content[0].text
         raw  = raw.replace("```json", "").replace("```", "").strip()
         data = json.loads(raw)
         return { "recommendations": data, "limited": False }
 
+    except json.JSONDecodeError as e:
+        return { "error": f"Failed to parse Claude response as JSON: {str(e)}", "limited": False }
     except Exception as e:
         return { "error": str(e), "limited": False }

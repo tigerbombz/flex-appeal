@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()  # must be first — loads .env before any other imports read env vars
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import odds, scoring, sleeper, yahoo, lineup, backtest, stats, ai

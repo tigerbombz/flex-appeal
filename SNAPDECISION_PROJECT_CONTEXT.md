@@ -184,9 +184,11 @@ All phases complete:
 ✅ freeSolo autocomplete in TradeAnalyzer for hypothetical trades
 ✅ Live/Mock data badge in WaiverAssistant roster summary
 ✅ Fixed duplicate key lint error on Autocomplete renderValue Chip
+✅ AI endpoints tested end to end — trade analyzer + waiver assistant fully working
+✅ AsyncAnthropic client — non-blocking async calls confirmed
+✅ load_dotenv() added to main.py startup
 
 ## Pending / Next Steps
-- [ ] Test AI endpoints end to end with real ANTHROPIC_API_KEY in production
 - [ ] Test pending trades detection with a live Yahoo league that has an active trade proposal
 - [ ] Consider adding league_key + team_key columns to users table in DB for faster pending trades lookup (currently fetches live on each request if not stored)
 - [ ] Phase 9 follow-up: replace nflPlayerPool mock data in WaiverAssistant with real Sleeper free agent search so available players are pulled from actual waivers
