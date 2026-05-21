@@ -34,11 +34,7 @@ export const scoringApi = {
     scoringFormat: ScoringFormat,
     scoringMode: string = 'balanced'
   ) => {
-    const res = await api.post('/api/scoring/score', {
-      players,
-      scoringFormat,
-      scoringMode,
-    });
+    const res = await api.post('/api/scoring/score', { players, scoringFormat, scoringMode });
     return res.data;
   },
   explainPlayer: async (
@@ -47,11 +43,7 @@ export const scoringApi = {
     scoringFormat: ScoringFormat,
     scoringMode: string = 'balanced'
   ) => {
-    const res = await api.post(`/api/scoring/explain/${playerId}`, {
-      players,
-      scoringFormat,
-      scoringMode,
-    });
+    const res = await api.post(`/api/scoring/explain/${playerId}`, { players, scoringFormat, scoringMode });
     return res.data;
   },
 };
@@ -81,13 +73,7 @@ export const lineupApi = {
     season: string = '2025'
   ) => {
     const res = await api.post('/api/lineup/evaluate', {
-      starters,
-      bench,
-      scoringFormat,
-      scoringMode,
-      week,
-      season,
-      team_id: 1,
+      starters, bench, scoringFormat, scoringMode, week, season, team_id: 1,
     });
     return res.data;
   },
@@ -96,11 +82,7 @@ export const lineupApi = {
     scoringFormat: ScoringFormat,
     scoringMode: string = 'balanced'
   ) => {
-    const res = await api.post('/api/lineup/flex', {
-      candidates,
-      scoringFormat,
-      scoringMode,
-    });
+    const res = await api.post('/api/lineup/flex', { candidates, scoringFormat, scoringMode });
     return res.data;
   },
 };
@@ -127,6 +109,13 @@ export const yahooApi = {
     const res = await api.get('/auth/yahoo/trades/pending');
     return res.data;
   },
+  getFreeAgents: async (leagueKey: string, position = '', count = 25) => {
+    const params = new URLSearchParams();
+    if (position) params.append('position', position);
+    params.append('count', count.toString());
+    const res = await api.get(`/auth/yahoo/free-agents/${leagueKey}?${params.toString()}`);
+    return res.data;
+  },
 };
 
 export const backtestApi = {
@@ -148,48 +137,28 @@ export const statsApi = {
     const res = await api.get('/api/stats/current-season');
     return res.data;
   },
-
   getPointsLastThree: async (
-    playerId:    string,
-    season:      string,
-    currentWeek: number,
-    scoring:     string = 'PPR'
+    playerId: string, season: string, currentWeek: number, scoring: string = 'PPR'
   ) => {
     const res = await api.post('/api/stats/points-last-three', {
-      player_id:    playerId,
-      season,
-      current_week: currentWeek,
-      scoring,
+      player_id: playerId, season, current_week: currentWeek, scoring,
     });
     return res.data;
   },
-
   getBulkPointsLastThree: async (
-    playerIds:   string[],
-    season:      string,
-    currentWeek: number,
-    scoring:     string = 'PPR'
+    playerIds: string[], season: string, currentWeek: number, scoring: string = 'PPR'
   ) => {
     const res = await api.post('/api/stats/points-last-three/bulk', {
-      player_ids:   playerIds,
-      season,
-      current_week: currentWeek,
-      scoring,
+      player_ids: playerIds, season, current_week: currentWeek, scoring,
     });
     return res.data;
   },
-
   getWeekStats: async (season: string, week: number) => {
     const res = await api.get(`/api/stats/week/${season}/${week}`);
     return res.data;
   },
-
   getTopPerformers: async (
-    season:   string,
-    week:     number,
-    position: string,
-    scoring:  string = 'PPR',
-    limit:    number = 20
+    season: string, week: number, position: string, scoring: string = 'PPR', limit: number = 20
   ) => {
     const res = await api.get(
       `/api/stats/top/${season}/${week}/${position}?scoring=${scoring}&limit=${limit}`
@@ -211,7 +180,6 @@ export const aiApi = {
     const res = await api.post('/api/ai/trade', payload);
     return res.data;
   },
-
   analyzeWaiver: async (payload: {
     starters:          any[];
     bench:             any[];
@@ -223,7 +191,6 @@ export const aiApi = {
     const res = await api.post('/api/ai/waiver', payload);
     return res.data;
   },
-
   getStatus: async () => {
     const res = await api.get('/api/ai/status');
     return res.data;

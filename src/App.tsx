@@ -9,27 +9,34 @@ import {
   CircularProgress,
 } from '@mui/material';
 import SportsFootballIcon from '@mui/icons-material/SportsFootball';
-import BoltIcon from '@mui/icons-material/Bolt';
-import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
-import SettingsIcon from '@mui/icons-material/Settings';
-import AppHeader from './components/AppHeader';
-import TeamOverview from './pages/TeamOverview';
-import LineupEval from './pages/LineupEval';
-import PlayerCompare from './pages/PlayerCompare';
-import Settings from './pages/Settings';
-import Landing from './pages/Landing';
-import TradeAnalyzer  from './pages/TradeAnalyzer';
-import WaiverAssistant from './pages/WaiverAssistant';
-import SwapHorizIcon  from '@mui/icons-material/SwapHoriz';
-import PersonAddIcon  from '@mui/icons-material/PersonAdd';
-import LeagueSelector from './components/LeagueSelector';
+import BoltIcon           from '@mui/icons-material/Bolt';
+import PeopleAltIcon      from '@mui/icons-material/PeopleAlt';
+import SwapHorizIcon      from '@mui/icons-material/SwapHoriz';
+import PersonAddIcon      from '@mui/icons-material/PersonAdd';
+import AppHeader          from './components/AppHeader';
+import TeamOverview       from './pages/TeamOverview';
+import LineupEval         from './pages/LineupEval';
+import PlayerCompare      from './pages/PlayerCompare';
+import Settings           from './pages/Settings';
+import Landing            from './pages/Landing';
+import TradeAnalyzer      from './pages/TradeAnalyzer';
+import WaiverAssistant    from './pages/WaiverAssistant';
+import LeagueSelector     from './components/LeagueSelector';
 import { useAuthContext } from './context/AuthContext';
 import { useYahooLeagues } from './hooks/useYahoo';
 
-const ACTIVE_TAB_KEY     = 'snapdecision_active_tab';
-const LEAGUE_KEY_KEY     = 'snapdecision_league_key';
-const ONBOARDED_KEY      = 'snapdecision_onboarded';
-const AUTH_ENABLED       = import.meta.env.VITE_AUTH_ENABLED === 'true';
+const ACTIVE_TAB_KEY = 'snapdecision_active_tab';
+const LEAGUE_KEY_KEY = 'snapdecision_league_key';
+const ONBOARDED_KEY  = 'snapdecision_onboarded';
+const AUTH_ENABLED   = import.meta.env.VITE_AUTH_ENABLED === 'true';
+
+// Tab indices
+// 0 — My Team
+// 1 — Lineup
+// 2 — Compare
+// 3 — Trade
+// 4 — Waivers
+// 5 — Settings (accessible via header gear icon only, not bottom nav)
 
 const App = () => {
   const [tab, setTab] = useState<number>(
@@ -44,11 +51,8 @@ const App = () => {
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const { user, checked, logout } = useAuthContext();
 
-  const isConnected   = !!user;
-  const { leagues, loading: leaguesLoading } = useYahooLeagues(
-    isConnected,
-    false
-  );
+  const isConnected = !!user;
+  const { leagues, loading: leaguesLoading } = useYahooLeagues(isConnected, false);
 
   // Show league selector after first login
   useEffect(() => {
@@ -92,11 +96,11 @@ const App = () => {
   return (
     <Box
       sx={{
-        maxWidth: isDesktop ? 1400 : 480,
-        mx: 'auto',
+        maxWidth:  isDesktop ? 1400 : 480,
+        mx:        'auto',
         minHeight: '100dvh',
-        pb: '68px',
-        px: isDesktop ? 4 : 0,
+        pb:        '68px',
+        px:        isDesktop ? 4 : 0,
       }}
     >
       {/* League selector modal — shown after first login */}
@@ -107,7 +111,8 @@ const App = () => {
         onSelect={handleLeagueSelect}
       />
 
-      <AppHeader onSettingsClick={() => handleTabChange(3)} />
+      {/* Settings tab index is 5 — triggered from header gear icon */}
+      <AppHeader onSettingsClick={() => handleTabChange(5)} />
 
       <Box>
         {tab === 0 && (
@@ -127,23 +132,26 @@ const App = () => {
         {tab === 5 && <Settings onLogout={handleLogout} />}
       </Box>
 
+      {/* Bottom nav — Settings intentionally excluded, accessed via header only */}
       <Paper
         sx={{
           position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
+          bottom:   0,
+          left:     0,
+          right:    0,
+          zIndex:   10,
         }}
         elevation={3}
       >
-        <BottomNavigation value={tab} onChange={(_, val) => handleTabChange(val)}>
+        <BottomNavigation
+          value={tab}
+          onChange={(_, val) => handleTabChange(val)}
+        >
           <BottomNavigationAction label="My Team" icon={<SportsFootballIcon />} />
-          <BottomNavigationAction label="Lineup" icon={<BoltIcon />} />
-          <BottomNavigationAction label="Compare" icon={<CompareArrowsIcon />} />
+          <BottomNavigationAction label="Lineup"  icon={<BoltIcon />} />
+          <BottomNavigationAction label="Compare" icon={<PeopleAltIcon />} />
           <BottomNavigationAction label="Trade"   icon={<SwapHorizIcon />} />
           <BottomNavigationAction label="Waivers" icon={<PersonAddIcon />} />
-          <BottomNavigationAction label="Settings" icon={<SettingsIcon />} />
         </BottomNavigation>
       </Paper>
     </Box>
