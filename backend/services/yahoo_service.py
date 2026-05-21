@@ -3,6 +3,7 @@ import os
 import base64
 from dotenv import load_dotenv
 from typing import Optional
+from models.player import LeagueScoring
 
 load_dotenv()
 
@@ -13,6 +14,47 @@ YAHOO_REDIRECT_URI  = os.getenv("YAHOO_REDIRECT_URI")
 YAHOO_AUTH_URL  = "https://api.login.yahoo.com/oauth2/request_auth"
 YAHOO_TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
 YAHOO_API_URL   = "https://fantasysports.yahooapis.com/fantasy/v2"
+
+# ─── Yahoo stat category IDs → our field names ───────────────────────────────
+# Full reference: https://yahoo-fantasy-api.readthedocs.io/en/latest/
+# These are the stat IDs Yahoo returns in league/settings for scoring categories.
+STAT_ID_MAP = {
+    # Passing
+    "4":  "passing_td_pts",      # Passing TDs
+    "5":  "passing_int_pts",     # Interceptions thrown
+    "3":  "passing_yd_pts",      # Passing yards (value = pts per yard)
+
+    # Rushing
+    "10": "rushing_yd_pts",      # Rushing yards
+    "12": "rushing_td_pts",      # Rushing TDs
+
+    # Receiving
+    "11": "receiving_yd_pts",    # Receiving yards
+    "13": "receiving_td_pts",    # Receiving TDs
+    "78": "reception_pts",       # Receptions (PPR value)
+
+    # First downs
+    "77": "first_down_pts",      # First down (rushing or receiving)
+
+    # Bonuses
+    "56": "bonus_100_rush",      # 100+ rushing yards bonus
+    "57": "bonus_100_rec",       # 100+ receiving yards bonus
+    "55": "bonus_300_pass",      # 300+ passing yards bonus
+    "89": "bonus_400_pass",      # 400+ passing yards bonus
+
+    # DST
+    "45": "dst_sack_pts",        # Sacks
+    "46": "dst_int_pts",         # Interceptions
+    "48": "dst_td_pts",          # Defensive TDs
+    "49": "dst_safety_pts",      # Safeties
+
+    # Kicker — Yahoo uses ranges
+    "74": "fg_0_39_pts",         # FG 0-39 yards
+    "75": "fg_40_49_pts",        # FG 40-49 yards
+    "76": "fg_50_plus_pts",      # FG 50+ yards
+    "72": "pat_pts",             # PAT made
+}
+
 
 def get_auth_url() -> str:
     client_id    = os.getenv("YAHOO_CLIENT_ID")
@@ -25,6 +67,7 @@ def get_auth_url() -> str:
     }
     query = "&".join([f"{k}={v}" for k, v in params.items()])
     return f"{YAHOO_AUTH_URL}?{query}"
+
 
 async def exchange_code_for_token(code: str, db=None) -> dict:
     client_id     = os.getenv("YAHOO_CLIENT_ID")
@@ -46,7 +89,6 @@ async def exchange_code_for_token(code: str, db=None) -> dict:
                 "Content-Type":  "application/x-www-form-urlencoded",
             },
         )
-        print(f"Token exchange status: {response.status_code}")
         response.raise_for_status()
         token_data = response.json()
 
@@ -73,6 +115,7 @@ async def exchange_code_for_token(code: str, db=None) -> dict:
         "expires_in":    expires_in,
     }
 
+
 async def get_yahoo_user_id(access_token: str) -> dict:
     async with httpx.AsyncClient() as client:
         response = await client.get(
@@ -87,6 +130,7 @@ async def get_yahoo_user_id(access_token: str) -> dict:
                 "email":        data.get("email", ""),
             }
         return { "yahoo_id": "default_user", "display_name": None, "email": None }
+
 
 async def refresh_access_token(yahoo_id: str, db=None) -> str:
     if not db:
@@ -127,6 +171,7 @@ async def refresh_access_token(yahoo_id: str, db=None) -> str:
     await save_tokens(db, yahoo_id, new_access_token, new_refresh_token, expires_in)
     return new_access_token
 
+
 async def yahoo_api_request(endpoint: str, yahoo_id: str, db=None) -> dict:
     if not db:
         raise Exception("Database session required")
@@ -160,6 +205,7 @@ async def yahoo_api_request(endpoint: str, yahoo_id: str, db=None) -> dict:
 
         response.raise_for_status()
         return response.json()
+
 
 async def get_user_leagues(yahoo_id: str, db=None) -> list:
     data = await yahoo_api_request(
@@ -197,6 +243,79 @@ async def get_user_leagues(yahoo_id: str, db=None) -> list:
     except Exception as e:
         raise Exception(f"Failed to parse leagues: {str(e)}")
 
+
+async def get_league_settings(
+    league_key: str,
+    yahoo_id:   str,
+    db=None,
+) -> LeagueScoring:
+    """
+    Fetch the league's scoring settings from Yahoo and return a LeagueScoring
+    model with per-stat point values.
+
+    This is what makes the scoring engine truly personalized — a 6pt passing TD
+    league will naturally rank QBs differently than a 4pt league.
+
+    Falls back to PPR defaults so the app never breaks if the API call fails.
+    """
+    try:
+        data = await yahoo_api_request(
+            f"league/{league_key}/settings",
+            yahoo_id,
+            db,
+        )
+
+        league_data      = data["fantasy_content"]["league"]
+        settings_wrapper = None
+
+        # Yahoo returns league as a list: [meta_dict, {settings: ...}]
+        for item in league_data:
+            if isinstance(item, dict) and "settings" in item:
+                settings_wrapper = item["settings"]
+                break
+
+        if not settings_wrapper:
+            print(f"No settings block found for {league_key}, using defaults")
+            return LeagueScoring()
+
+        stat_categories = settings_wrapper.get("stat_categories", {})
+        stats           = stat_categories.get("stats", {})
+        stat_count      = int(stats.get("count", 0))
+
+        # Build a map of stat_id -> points value
+        scoring_map: dict[str, float] = {}
+
+        for i in range(stat_count):
+            stat_wrapper = stats.get(str(i), {}).get("stat", {})
+            stat_id      = str(stat_wrapper.get("stat_id", ""))
+            enabled      = stat_wrapper.get("enabled", "0")
+            value        = stat_wrapper.get("value")
+
+            # Skip disabled stats or stats with no point value
+            if enabled != "1" or value is None:
+                continue
+
+            try:
+                pts = float(value)
+            except (ValueError, TypeError):
+                continue
+
+            field = STAT_ID_MAP.get(stat_id)
+            if field:
+                scoring_map[field] = pts
+
+        if not scoring_map:
+            print(f"Empty scoring map for {league_key}, using defaults")
+            return LeagueScoring()
+
+        # Build the LeagueScoring — unrecognised stats just keep defaults
+        return LeagueScoring(**scoring_map)
+
+    except Exception as e:
+        print(f"get_league_settings error for {league_key}: {e} — using defaults")
+        return LeagueScoring()
+
+
 async def get_my_team(league_key: str, yahoo_id: str, db=None) -> dict:
     data = await yahoo_api_request(f"league/{league_key}/teams", yahoo_id, db)
 
@@ -223,6 +342,7 @@ async def get_my_team(league_key: str, yahoo_id: str, db=None) -> dict:
         raise Exception("Could not find user team in league")
     except Exception as e:
         raise Exception(f"Failed to parse team: {str(e)}")
+
 
 async def get_roster(league_key: str, team_key: str, yahoo_id: str, db=None) -> list:
     data = await yahoo_api_request(f"team/{team_key}/roster/players", yahoo_id, db)
@@ -253,6 +373,93 @@ async def get_roster(league_key: str, team_key: str, yahoo_id: str, db=None) -> 
     except Exception as e:
         raise Exception(f"Failed to parse roster: {str(e)}")
 
+
+async def get_roster_with_points(
+    league_key: str,
+    team_key:   str,
+    yahoo_id:   str,
+    week:       int,
+    db=None,
+) -> list:
+    """
+    Fetch a team's roster WITH actual fantasy points scored for a specific week.
+
+    This is the core of Backtest Phase 8 — we pull Yahoo's official scoring
+    for each player so we can compare the engine's recommendations vs reality.
+
+    Returns each player with an `actual_pts` field.
+    """
+    try:
+        # ;type=week;week=N tells Yahoo to return points for that specific week
+        data = await yahoo_api_request(
+            f"team/{team_key}/roster;type=week;week={week}/players/stats;type=week;week={week}",
+            yahoo_id,
+            db,
+        )
+
+        players     = []
+        roster      = data["fantasy_content"]["team"][1]["roster"]
+        player_list = roster["0"]["players"]
+        count       = int(player_list["count"])
+
+        for i in range(count):
+            player_wrapper = player_list[str(i)]["player"]
+            player_meta    = player_wrapper[0] if len(player_wrapper) > 0 else []
+            player_stats   = player_wrapper[1] if len(player_wrapper) > 1 else {}
+
+            player_info = {}
+            for item in player_meta:
+                if isinstance(item, dict):
+                    player_info.update(item)
+
+            # Extract actual fantasy points from the stats block
+            actual_pts   = None
+            player_stats_data = player_stats.get("player_stats", {})
+            stats_list   = player_stats_data.get("stats", [])
+
+            # Yahoo sometimes nests points under player_points
+            player_points = player_stats.get("player_points", {})
+            if isinstance(player_points, dict):
+                try:
+                    actual_pts = float(player_points.get("total", 0) or 0)
+                except (ValueError, TypeError):
+                    actual_pts = None
+
+            # Fallback: sum up scoring stats manually if player_points missing
+            if actual_pts is None and stats_list:
+                actual_pts = 0.0
+
+            # Slot tells us if player was actually started
+            selected_position = player_info.get("selected_position", {})
+            if isinstance(selected_position, list):
+                for item in selected_position:
+                    if isinstance(item, dict) and "position" in item:
+                        selected_position = item
+                        break
+
+            slot = (
+                selected_position.get("position", "BN")
+                if isinstance(selected_position, dict) else "BN"
+            )
+
+            players.append({
+                "player_key": player_info.get("player_key", ""),
+                "name":       player_info.get("full_name", "Unknown"),
+                "position":   player_info.get("display_position", ""),
+                "team":       player_info.get("editorial_team_abbr", "").upper(),
+                "slot":       slot,
+                "is_starter": slot not in ("BN", "IR", "NA"),
+                "actual_pts": actual_pts,
+                "week":       week,
+            })
+
+        return players
+
+    except Exception as e:
+        print(f"get_roster_with_points error week {week}: {e}")
+        return []
+
+
 async def get_free_agents(
     league_key: str,
     yahoo_id:   str,
@@ -260,18 +467,9 @@ async def get_free_agents(
     position:   str = "",
     count:      int = 25,
 ) -> list:
-    """
-    Fetch available free agents in a league with ownership % and injury status.
-    These are players not on any roster — the actual waiver pool.
-    Sorted by ownership % descending so most relevant pickups come first.
-    Falls back to [] gracefully so the frontend always works.
-    """
     try:
         pos_filter = f";position={position}" if position else ""
-
-        # status=A = available (not on a roster)
-        # sort=OR  = sort by ownership rate descending
-        endpoint = (
+        endpoint   = (
             f"league/{league_key}/players"
             f";status=A"
             f"{pos_filter}"
@@ -292,14 +490,13 @@ async def get_free_agents(
         total = int(players_raw.get("count", 0))
 
         for i in range(total):
-            p_wrapper = players_raw.get(str(i), {}).get("player", [])
+            p_wrapper      = players_raw.get(str(i), {}).get("player", [])
             if not p_wrapper:
                 continue
 
             p_meta         = p_wrapper[0] if len(p_wrapper) > 0 else []
             p_percent_data = p_wrapper[1] if len(p_wrapper) > 1 else {}
 
-            # Parse flat meta list Yahoo returns
             player_info = {}
             for item in p_meta:
                 if isinstance(item, dict):
@@ -310,7 +507,6 @@ async def get_free_agents(
                             if "position" in sub and "display_position" not in player_info:
                                 player_info["display_position"] = sub["position"]
 
-            # Parse ownership % from percent_owned sub-resource
             ownership_pct = 0.0
             if isinstance(p_percent_data, dict):
                 po = p_percent_data.get("percent_owned", {})
@@ -322,15 +518,10 @@ async def get_free_agents(
                             except (ValueError, TypeError):
                                 ownership_pct = 0.0
 
-            # Human-readable injury status
             raw_status = player_info.get("status", "")
             status_map = {
-                "Q":   "Questionable",
-                "D":   "Doubtful",
-                "O":   "Out",
-                "IR":  "IR",
-                "PUP": "PUP",
-                "NA":  "NA",
+                "Q": "Questionable", "D": "Doubtful", "O": "Out",
+                "IR": "IR", "PUP": "PUP", "NA": "NA",
             }
             status = status_map.get(raw_status, "Active")
 
@@ -353,11 +544,8 @@ async def get_free_agents(
         print(f"get_free_agents error (returning []): {e}")
         return []
 
+
 async def get_pending_trades(league_key: str, team_key: str, yahoo_id: str, db=None) -> list:
-    """
-    Fetch pending trade proposals involving the user's team.
-    Returns [] gracefully on any error so the frontend never breaks.
-    """
     try:
         data = await yahoo_api_request(
             f"league/{league_key}/transactions;types=pending_trade;team_key={team_key}",
@@ -434,6 +622,7 @@ async def get_pending_trades(league_key: str, team_key: str, yahoo_id: str, db=N
     except Exception as e:
         print(f"get_pending_trades error (returning []): {e}")
         return []
+
 
 def normalize_scoring_format(yahoo_scoring_type: str) -> str:
     mapping = {
