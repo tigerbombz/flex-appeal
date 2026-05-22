@@ -1,24 +1,52 @@
-import { Box, Typography, Chip, FormControl, InputLabel, Select, MenuItem, CircularProgress, Alert } from '@mui/material';
-import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import {
+  Box, Typography, Chip, FormControl, InputLabel,
+  Select, MenuItem, CircularProgress, Alert,
+} from '@mui/material';
+import SwapHorizIcon          from '@mui/icons-material/SwapHoriz';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
-import EvalCard from '../components/EvalCard';
-import ModeSelector from '../components/ModeSelector';
-import { mockRoster, mockLeague } from '../data/mockData';
-import { useLineup } from '../hooks/useLineup';
-import { useSettings } from '../context/SettingsContext';
+import EvalCard               from '../components/EvalCard';
+import ModeSelector           from '../components/ModeSelector';
+import { useLineup }          from '../hooks/useLineup';
+import { useRoster }          from '../hooks/useRoster';
+import { useSettings }        from '../context/SettingsContext';
+import { useYahooStatus }     from '../hooks/useYahoo';
 import type { ScoringFormat } from '../utils/scoring';
 
 const LineupEval = () => {
   const { scoringFormat, scoringMode, setScoringFormat, setScoringMode } = useSettings();
+  const { connected, sessionExpired } = useYahooStatus();
 
-  const { result, loading, error } = useLineup(
-    mockRoster.starters,
-    mockRoster.bench,
+  // Pull the selected league key — set during onboarding in LeagueSelector
+  const selectedLeagueKey = localStorage.getItem('selected_league_key') || '';
+
+  // Real roster with league scoring settings baked in
+  const {
+    starters,
+    bench,
+    isRealData,
+    loading:      rosterLoading,
+    error:        rosterError,
+    leagueName,
+    week,
+    season,
+    leagueKey,
+    leagueScoring,
+  } = useRoster(connected, sessionExpired, selectedLeagueKey, scoringFormat);
+
+  // Lineup evaluation — re-runs whenever roster or league scoring changes
+  const { result, loading: evalLoading, error: evalError } = useLineup(
+    starters,
+    bench,
     scoringFormat,
     scoringMode,
-    mockLeague.week,
-    '2025'
+    week,
+    season,
+    leagueKey,
+    leagueScoring,    // null falls back to generic format boosts — safe
   );
+
+  const loading = rosterLoading || evalLoading;
+  const error   = rosterError   || evalError;
 
   return (
     <Box sx={{ p: 2 }}>
@@ -29,7 +57,14 @@ const LineupEval = () => {
           Lineup Evaluation
         </Typography>
         <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 0.5 }}>
-          Week {mockLeague.week} · Starters vs Bench · Includes K and D/ST
+          {isRealData
+            ? `${leagueName} · Week ${week} · Starters vs Bench`
+            : `Week ${week} · Starters vs Bench · Includes K and D/ST`}
+          {leagueScoring && (
+            <Box component="span" sx={{ ml: 1, color: 'primary.main', fontWeight: 600 }}>
+              · League rules active
+            </Box>
+          )}
         </Typography>
       </Box>
 
@@ -53,13 +88,13 @@ const LineupEval = () => {
       {/* Mode explanation */}
       <Box
         sx={{
-          bgcolor: 'background.paper',
-          border: '1px solid',
-          borderColor: 'divider',
+          bgcolor:      'background.paper',
+          border:       '1px solid',
+          borderColor:  'divider',
           borderRadius: 2,
-          px: 2,
-          py: 1,
-          mb: 2,
+          px:           2,
+          py:           1,
+          mb:           2,
         }}
       >
         <Typography sx={{ fontSize: 12, color: 'text.secondary' }}>
@@ -68,6 +103,13 @@ const LineupEval = () => {
           {scoringMode === 'upside'   && '🚀 Upside mode — targets boom potential. Best for must-win when you need a big week.'}
         </Typography>
       </Box>
+
+      {/* Mock data notice */}
+      {!isRealData && !rosterLoading && (
+        <Alert severity="info" sx={{ mb: 2, fontSize: 12 }}>
+          Showing sample data — connect Yahoo and select a league to evaluate your real roster
+        </Alert>
+      )}
 
       {/* Error */}
       {error && (
@@ -81,7 +123,7 @@ const LineupEval = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6, gap: 2 }}>
           <CircularProgress size={24} />
           <Typography sx={{ color: 'text.secondary', fontSize: 13 }}>
-            Evaluating your lineup...
+            {rosterLoading ? 'Loading your roster…' : 'Evaluating your lineup…'}
           </Typography>
         </Box>
       )}
@@ -96,9 +138,9 @@ const LineupEval = () => {
               label={`${result.totalSwaps} suggested swap${result.totalSwaps !== 1 ? 's' : ''}`}
               sx={{
                 fontWeight: 600,
-                bgcolor: '#eab30820',
-                color: '#eab308',
-                border: '1px solid #eab30840',
+                bgcolor:    '#eab30820',
+                color:      '#eab308',
+                border:     '1px solid #eab30840',
                 '& .MuiChip-icon': { color: '#eab308' },
               }}
             />
@@ -108,9 +150,9 @@ const LineupEval = () => {
               label={`${result.totalKeeps} confirmed starter${result.totalKeeps !== 1 ? 's' : ''}`}
               sx={{
                 fontWeight: 600,
-                bgcolor: '#22c55e20',
-                color: '#22c55e',
-                border: '1px solid #22c55e40',
+                bgcolor:    '#22c55e20',
+                color:      '#22c55e',
+                border:     '1px solid #22c55e40',
                 '& .MuiChip-icon': { color: '#22c55e' },
               }}
             />
@@ -123,8 +165,11 @@ const LineupEval = () => {
           </Box>
 
           <Typography sx={{ mt: 3, fontSize: 12, color: 'text.secondary', textAlign: 'center', lineHeight: 1.6, px: 2 }}>
-            Position-specific weights · Vegas props · Team totals · Usage · Trend · Matchup.
-            Always apply your own judgment — this is a decision aid, not gospel.
+            {leagueScoring
+              ? 'Scored using your league\'s actual rules · Vegas props · Team totals · Usage · Trend · Matchup'
+              : 'Position-specific weights · Vegas props · Team totals · Usage · Trend · Matchup'
+            }
+            {'. '}Always apply your own judgment — this is a decision aid, not gospel.
           </Typography>
         </>
       )}

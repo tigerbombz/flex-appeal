@@ -1,59 +1,62 @@
 import { useState, useEffect } from 'react';
 import { lineupApi } from '../services/api';
+import type { LeagueScoring } from '../services/api';
 import type { Player } from '../types/index';
 import type { ScoringFormat } from '../utils/scoring';
 import type { ScoringMode } from './useScoring';
 
 export interface PlayerEval {
-  id: number | null;
-  name: string | null;
-  position: string | null;
-  team: string | null;
-  opponent: string | null;
-  score: number | null;
-  floor: number | null;
-  ceiling: number | null;
-  scoreLabel: string | null;
-  scoreColor: string | null;
-  status: string | null;
-  volatility: string | null;
-  weather: string | null;
-  isDome: boolean | null;
-  oppRank: number | null;
+  id:          number | null;
+  name:        string | null;
+  position:    string | null;
+  team:        string | null;
+  opponent:    string | null;
+  score:       number | null;
+  floor:       number | null;
+  ceiling:     number | null;
+  scoreLabel:  string | null;
+  scoreColor:  string | null;
+  status:      string | null;
+  volatility:  string | null;
+  weather:     string | null;
+  isDome:      boolean | null;
+  oppRank:     number | null;
   explanation: string | null;
 }
 
 export interface LineupEval {
-  slot: string;
-  current: PlayerEval;
-  suggestion: PlayerEval | null;
+  slot:            string;
+  current:         PlayerEval;
+  suggestion:      PlayerEval | null;
   allAlternatives: PlayerEval[];
-  recommendation: 'swap' | 'keep';
-  reason: string;
-  scoreDiff: number;
-  mode: string;
+  recommendation:  'swap' | 'keep';
+  reason:          string;
+  scoreDiff:       number;
+  mode:            string;
 }
 
 export interface LineupResult {
-  evaluations: LineupEval[];
-  totalSwaps: number;
-  totalKeeps: number;
+  evaluations:   LineupEval[];
+  totalSwaps:    number;
+  totalKeeps:    number;
   scoringFormat: string;
-  scoringMode: string;
-  summary: string;
+  scoringMode:   string;
+  summary:       string;
 }
 
 export const useLineup = (
-  starters: Player[],
-  bench: Player[],
-  scoringFormat: ScoringFormat,
-  scoringMode: ScoringMode = 'balanced',
-  week: number = 14,
-  season: string = '2025'
+  starters:       Player[],
+  bench:          Player[],
+  scoringFormat:  ScoringFormat,
+  scoringMode:    ScoringMode    = 'balanced',
+  week:           number         = 14,
+  season:         string         = '2025',
+  leagueKey?:     string,
+  leagueScoring?: LeagueScoring | null,
 ) => {
-  const [result, setResult] = useState<LineupResult | null>(null);
+  const [result, setResult]   = useState<LineupResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
     if (!starters.length) return;
@@ -69,6 +72,8 @@ export const useLineup = (
           scoringMode,
           week,
           season,
+          leagueKey,
+          leagueScoring ?? undefined,
         );
         setResult(data);
       } catch (err) {
@@ -80,7 +85,17 @@ export const useLineup = (
     };
 
     evaluate();
-  }, [starters, bench, scoringFormat, scoringMode, week, season]);
+  }, [
+    starters,
+    bench,
+    scoringFormat,
+    scoringMode,
+    week,
+    season,
+    leagueKey,
+    // Stringify so effect only re-runs when scoring rules actually change
+    JSON.stringify(leagueScoring),
+  ]);
 
   return { result, loading, error };
 };
