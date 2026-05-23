@@ -230,6 +230,13 @@ export const yahooApi = {
   },
 
   /** Clear cached settings for a league (call after reconnecting Yahoo) */
+
+  getMatchup: async (leagueKey: string, week?: number) => {
+    const params = week ? `?week=${week}` : "";
+    const res    = await api.get(`/auth/yahoo/matchup/${leagueKey}${params}`);
+    return res.data;
+  },
+
   clearLeagueSettingsCache: (leagueKey?: string) => {
     if (leagueKey) {
       localStorage.removeItem(`${LEAGUE_SETTINGS_CACHE_KEY}_${leagueKey}`);

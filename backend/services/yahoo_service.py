@@ -7,61 +7,39 @@ from models.player import LeagueScoring
 
 load_dotenv()
 
-YAHOO_CLIENT_ID     = os.getenv("YAHOO_CLIENT_ID")
-YAHOO_CLIENT_SECRET = os.getenv("YAHOO_CLIENT_SECRET")
-YAHOO_REDIRECT_URI  = os.getenv("YAHOO_REDIRECT_URI")
-
 YAHOO_AUTH_URL  = "https://api.login.yahoo.com/oauth2/request_auth"
 YAHOO_TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
 YAHOO_API_URL   = "https://fantasysports.yahooapis.com/fantasy/v2"
 
-# ─── Yahoo stat category IDs → our field names ───────────────────────────────
-# Full reference: https://yahoo-fantasy-api.readthedocs.io/en/latest/
-# These are the stat IDs Yahoo returns in league/settings for scoring categories.
 STAT_ID_MAP = {
-    # Passing
-    "4":  "passing_td_pts",      # Passing TDs
-    "5":  "passing_int_pts",     # Interceptions thrown
-    "3":  "passing_yd_pts",      # Passing yards (value = pts per yard)
-
-    # Rushing
-    "10": "rushing_yd_pts",      # Rushing yards
-    "12": "rushing_td_pts",      # Rushing TDs
-
-    # Receiving
-    "11": "receiving_yd_pts",    # Receiving yards
-    "13": "receiving_td_pts",    # Receiving TDs
-    "78": "reception_pts",       # Receptions (PPR value)
-
-    # First downs
-    "77": "first_down_pts",      # First down (rushing or receiving)
-
-    # Bonuses
-    "56": "bonus_100_rush",      # 100+ rushing yards bonus
-    "57": "bonus_100_rec",       # 100+ receiving yards bonus
-    "55": "bonus_300_pass",      # 300+ passing yards bonus
-    "89": "bonus_400_pass",      # 400+ passing yards bonus
-
-    # DST
-    "45": "dst_sack_pts",        # Sacks
-    "46": "dst_int_pts",         # Interceptions
-    "48": "dst_td_pts",          # Defensive TDs
-    "49": "dst_safety_pts",      # Safeties
-
-    # Kicker — Yahoo uses ranges
-    "74": "fg_0_39_pts",         # FG 0-39 yards
-    "75": "fg_40_49_pts",        # FG 40-49 yards
-    "76": "fg_50_plus_pts",      # FG 50+ yards
-    "72": "pat_pts",             # PAT made
+    "4":  "passing_td_pts",
+    "5":  "passing_int_pts",
+    "3":  "passing_yd_pts",
+    "10": "rushing_yd_pts",
+    "12": "rushing_td_pts",
+    "11": "receiving_yd_pts",
+    "13": "receiving_td_pts",
+    "78": "reception_pts",
+    "77": "first_down_pts",
+    "56": "bonus_100_rush",
+    "57": "bonus_100_rec",
+    "55": "bonus_300_pass",
+    "89": "bonus_400_pass",
+    "45": "dst_sack_pts",
+    "46": "dst_int_pts",
+    "48": "dst_td_pts",
+    "49": "dst_safety_pts",
+    "74": "fg_0_39_pts",
+    "75": "fg_40_49_pts",
+    "76": "fg_50_plus_pts",
+    "72": "pat_pts",
 }
 
 
 def get_auth_url() -> str:
-    client_id    = os.getenv("YAHOO_CLIENT_ID")
-    redirect_uri = os.getenv("YAHOO_REDIRECT_URI")
     params = {
-        "client_id":     client_id,
-        "redirect_uri":  redirect_uri,
+        "client_id":     os.getenv("YAHOO_CLIENT_ID"),
+        "redirect_uri":  os.getenv("YAHOO_REDIRECT_URI"),
         "response_type": "code",
         "language":      "en-us",
     }
@@ -70,11 +48,8 @@ def get_auth_url() -> str:
 
 
 async def exchange_code_for_token(code: str, db=None) -> dict:
-    client_id     = os.getenv("YAHOO_CLIENT_ID")
-    client_secret = os.getenv("YAHOO_CLIENT_SECRET")
-    redirect_uri  = os.getenv("YAHOO_REDIRECT_URI")
-    credentials   = f"{client_id}:{client_secret}"
-    encoded       = base64.b64encode(credentials.encode()).decode()
+    credentials = f"{os.getenv('YAHOO_CLIENT_ID')}:{os.getenv('YAHOO_CLIENT_SECRET')}"
+    encoded     = base64.b64encode(credentials.encode()).decode()
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -82,7 +57,7 @@ async def exchange_code_for_token(code: str, db=None) -> dict:
             data={
                 "grant_type":   "authorization_code",
                 "code":         code,
-                "redirect_uri": redirect_uri,
+                "redirect_uri": os.getenv("YAHOO_REDIRECT_URI"),
             },
             headers={
                 "Authorization": f"Basic {encoded}",
@@ -95,17 +70,12 @@ async def exchange_code_for_token(code: str, db=None) -> dict:
     access_token  = token_data["access_token"]
     refresh_token = token_data["refresh_token"]
     expires_in    = token_data.get("expires_in", 3600)
-
-    user_info = await get_yahoo_user_id(access_token)
+    user_info     = await get_yahoo_user_id(access_token)
 
     if db:
         from models.user_repository import save_tokens, get_or_create_user
-        await get_or_create_user(
-            db,
-            yahoo_id     = user_info["yahoo_id"],
-            display_name = user_info["display_name"],
-            email        = user_info["email"],
-        )
+        await get_or_create_user(db, yahoo_id=user_info["yahoo_id"],
+                                 display_name=user_info["display_name"], email=user_info["email"])
         await save_tokens(db, user_info["yahoo_id"], access_token, refresh_token, expires_in)
 
     return {
@@ -120,7 +90,7 @@ async def get_yahoo_user_id(access_token: str) -> dict:
     async with httpx.AsyncClient() as client:
         response = await client.get(
             "https://api.login.yahoo.com/openid/v1/userinfo",
-            headers={ "Authorization": f"Bearer {access_token}" },
+            headers={"Authorization": f"Bearer {access_token}"},
         )
         if response.status_code == 200:
             data = response.json()
@@ -129,7 +99,7 @@ async def get_yahoo_user_id(access_token: str) -> dict:
                 "display_name": data.get("name") or data.get("given_name", ""),
                 "email":        data.get("email", ""),
             }
-        return { "yahoo_id": "default_user", "display_name": None, "email": None }
+        return {"yahoo_id": "default_user", "display_name": None, "email": None}
 
 
 async def refresh_access_token(yahoo_id: str, db=None) -> str:
@@ -138,15 +108,11 @@ async def refresh_access_token(yahoo_id: str, db=None) -> str:
 
     from models.user_repository import get_refresh_token, save_tokens
     refresh_token = await get_refresh_token(db, yahoo_id)
-
     if not refresh_token:
         raise Exception("No refresh token available — user must re-authenticate")
 
-    client_id     = os.getenv("YAHOO_CLIENT_ID")
-    client_secret = os.getenv("YAHOO_CLIENT_SECRET")
-    redirect_uri  = os.getenv("YAHOO_REDIRECT_URI")
-    credentials   = f"{client_id}:{client_secret}"
-    encoded       = base64.b64encode(credentials.encode()).decode()
+    credentials = f"{os.getenv('YAHOO_CLIENT_ID')}:{os.getenv('YAHOO_CLIENT_SECRET')}"
+    encoded     = base64.b64encode(credentials.encode()).decode()
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -154,7 +120,7 @@ async def refresh_access_token(yahoo_id: str, db=None) -> str:
             data={
                 "grant_type":    "refresh_token",
                 "refresh_token": refresh_token,
-                "redirect_uri":  redirect_uri,
+                "redirect_uri":  os.getenv("YAHOO_REDIRECT_URI"),
             },
             headers={
                 "Authorization": f"Basic {encoded}",
@@ -167,7 +133,6 @@ async def refresh_access_token(yahoo_id: str, db=None) -> str:
     new_access_token  = token_data["access_token"]
     new_refresh_token = token_data.get("refresh_token", refresh_token)
     expires_in        = token_data.get("expires_in", 3600)
-
     await save_tokens(db, yahoo_id, new_access_token, new_refresh_token, expires_in)
     return new_access_token
 
@@ -178,54 +143,38 @@ async def yahoo_api_request(endpoint: str, yahoo_id: str, db=None) -> dict:
 
     from models.user_repository import get_active_token
     access_token = await get_active_token(db, yahoo_id)
-
     if not access_token:
         access_token = await refresh_access_token(yahoo_id, db)
 
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f"{YAHOO_API_URL}/{endpoint}",
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Accept":        "application/json",
-            },
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
             params={"format": "json"},
         )
-
         if response.status_code == 401:
             access_token = await refresh_access_token(yahoo_id, db)
             response = await client.get(
                 f"{YAHOO_API_URL}/{endpoint}",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Accept":        "application/json",
-                },
+                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
                 params={"format": "json"},
             )
-
         response.raise_for_status()
         return response.json()
 
 
 async def get_user_leagues(yahoo_id: str, db=None) -> list:
-    data = await yahoo_api_request(
-        "users;use_login=1/games;game_keys=nfl/leagues",
-        yahoo_id,
-        db,
-    )
-
+    data = await yahoo_api_request("users;use_login=1/games;game_keys=nfl/leagues", yahoo_id, db)
     try:
         leagues    = []
         users      = data["fantasy_content"]["users"]
         user       = users["0"]["user"]
         games      = user[1]["games"]
         game_count = int(games["count"])
-
         for i in range(game_count):
             game         = games[str(i)]["game"]
             league_data  = game[1]["leagues"]
             league_count = int(league_data["count"])
-
             for j in range(league_count):
                 league = league_data[str(j)]["league"][0]
                 leagues.append({
@@ -238,51 +187,25 @@ async def get_user_leagues(yahoo_id: str, db=None) -> list:
                     "scoring_format": normalize_scoring_format(league.get("scoring_type", "head")),
                     "current_week":   league.get("current_week"),
                 })
-
         return leagues
     except Exception as e:
         raise Exception(f"Failed to parse leagues: {str(e)}")
 
 
-async def get_league_settings(
-    league_key: str,
-    yahoo_id:   str,
-    db=None,
-) -> LeagueScoring:
-    """
-    Fetch the league's scoring settings from Yahoo and return a LeagueScoring
-    model with per-stat point values.
-
-    This is what makes the scoring engine truly personalized — a 6pt passing TD
-    league will naturally rank QBs differently than a 4pt league.
-
-    Falls back to PPR defaults so the app never breaks if the API call fails.
-    """
+async def get_league_settings(league_key: str, yahoo_id: str, db=None) -> LeagueScoring:
     try:
-        data = await yahoo_api_request(
-            f"league/{league_key}/settings",
-            yahoo_id,
-            db,
-        )
-
+        data             = await yahoo_api_request(f"league/{league_key}/settings", yahoo_id, db)
         league_data      = data["fantasy_content"]["league"]
         settings_wrapper = None
-
-        # Yahoo returns league as a list: [meta_dict, {settings: ...}]
         for item in league_data:
             if isinstance(item, dict) and "settings" in item:
                 settings_wrapper = item["settings"]
                 break
-
         if not settings_wrapper:
-            print(f"No settings block found for {league_key}, using defaults")
             return LeagueScoring()
 
-        stat_categories = settings_wrapper.get("stat_categories", {})
-        stats           = stat_categories.get("stats", {})
-        stat_count      = int(stats.get("count", 0))
-
-        # Build a map of stat_id -> points value
+        stats      = settings_wrapper.get("stat_categories", {}).get("stats", {})
+        stat_count = int(stats.get("count", 0))
         scoring_map: dict[str, float] = {}
 
         for i in range(stat_count):
@@ -290,27 +213,17 @@ async def get_league_settings(
             stat_id      = str(stat_wrapper.get("stat_id", ""))
             enabled      = stat_wrapper.get("enabled", "0")
             value        = stat_wrapper.get("value")
-
-            # Skip disabled stats or stats with no point value
             if enabled != "1" or value is None:
                 continue
-
             try:
                 pts = float(value)
             except (ValueError, TypeError):
                 continue
-
             field = STAT_ID_MAP.get(stat_id)
             if field:
                 scoring_map[field] = pts
 
-        if not scoring_map:
-            print(f"Empty scoring map for {league_key}, using defaults")
-            return LeagueScoring()
-
-        # Build the LeagueScoring — unrecognised stats just keep defaults
-        return LeagueScoring(**scoring_map)
-
+        return LeagueScoring(**scoring_map) if scoring_map else LeagueScoring()
     except Exception as e:
         print(f"get_league_settings error for {league_key}: {e} — using defaults")
         return LeagueScoring()
@@ -318,18 +231,15 @@ async def get_league_settings(
 
 async def get_my_team(league_key: str, yahoo_id: str, db=None) -> dict:
     data = await yahoo_api_request(f"league/{league_key}/teams", yahoo_id, db)
-
     try:
         teams      = data["fantasy_content"]["league"][1]["teams"]
         team_count = int(teams["count"])
-
         for i in range(team_count):
             team      = teams[str(i)]["team"][0]
             team_info = {}
             for item in team:
                 if isinstance(item, dict):
                     team_info.update(item)
-
             if team_info.get("is_owned_by_current_login"):
                 return {
                     "team_key": team_info.get("team_key"),
@@ -338,7 +248,6 @@ async def get_my_team(league_key: str, yahoo_id: str, db=None) -> dict:
                     "wins":     team_info.get("wins"),
                     "losses":   team_info.get("losses"),
                 }
-
         raise Exception("Could not find user team in league")
     except Exception as e:
         raise Exception(f"Failed to parse team: {str(e)}")
@@ -346,20 +255,17 @@ async def get_my_team(league_key: str, yahoo_id: str, db=None) -> dict:
 
 async def get_roster(league_key: str, team_key: str, yahoo_id: str, db=None) -> list:
     data = await yahoo_api_request(f"team/{team_key}/roster/players", yahoo_id, db)
-
     try:
         players     = []
         roster      = data["fantasy_content"]["team"][1]["roster"]
         player_list = roster["0"]["players"]
         count       = int(player_list["count"])
-
         for i in range(count):
             player      = player_list[str(i)]["player"][0]
             player_info = {}
             for item in player:
                 if isinstance(item, dict):
                     player_info.update(item)
-
             players.append({
                 "player_key":  player_info.get("player_key"),
                 "name":        player_info.get("full_name"),
@@ -368,35 +274,19 @@ async def get_roster(league_key: str, team_key: str, yahoo_id: str, db=None) -> 
                 "status":      player_info.get("status", "active"),
                 "injury_note": player_info.get("injury_note"),
             })
-
         return players
     except Exception as e:
         raise Exception(f"Failed to parse roster: {str(e)}")
 
 
 async def get_roster_with_points(
-    league_key: str,
-    team_key:   str,
-    yahoo_id:   str,
-    week:       int,
-    db=None,
+    league_key: str, team_key: str, yahoo_id: str, week: int, db=None
 ) -> list:
-    """
-    Fetch a team's roster WITH actual fantasy points scored for a specific week.
-
-    This is the core of Backtest Phase 8 — we pull Yahoo's official scoring
-    for each player so we can compare the engine's recommendations vs reality.
-
-    Returns each player with an `actual_pts` field.
-    """
     try:
-        # ;type=week;week=N tells Yahoo to return points for that specific week
         data = await yahoo_api_request(
             f"team/{team_key}/roster;type=week;week={week}/players/stats;type=week;week={week}",
-            yahoo_id,
-            db,
+            yahoo_id, db,
         )
-
         players     = []
         roster      = data["fantasy_content"]["team"][1]["roster"]
         player_list = roster["0"]["players"]
@@ -412,12 +302,7 @@ async def get_roster_with_points(
                 if isinstance(item, dict):
                     player_info.update(item)
 
-            # Extract actual fantasy points from the stats block
-            actual_pts   = None
-            player_stats_data = player_stats.get("player_stats", {})
-            stats_list   = player_stats_data.get("stats", [])
-
-            # Yahoo sometimes nests points under player_points
+            actual_pts    = None
             player_points = player_stats.get("player_points", {})
             if isinstance(player_points, dict):
                 try:
@@ -425,22 +310,14 @@ async def get_roster_with_points(
                 except (ValueError, TypeError):
                     actual_pts = None
 
-            # Fallback: sum up scoring stats manually if player_points missing
-            if actual_pts is None and stats_list:
-                actual_pts = 0.0
-
-            # Slot tells us if player was actually started
             selected_position = player_info.get("selected_position", {})
             if isinstance(selected_position, list):
                 for item in selected_position:
                     if isinstance(item, dict) and "position" in item:
                         selected_position = item
                         break
-
-            slot = (
-                selected_position.get("position", "BN")
-                if isinstance(selected_position, dict) else "BN"
-            )
+            slot = (selected_position.get("position", "BN")
+                    if isinstance(selected_position, dict) else "BN")
 
             players.append({
                 "player_key": player_info.get("player_key", ""),
@@ -452,33 +329,101 @@ async def get_roster_with_points(
                 "actual_pts": actual_pts,
                 "week":       week,
             })
-
         return players
-
     except Exception as e:
         print(f"get_roster_with_points error week {week}: {e}")
         return []
 
 
-async def get_free_agents(
+async def get_current_matchup(
     league_key: str,
+    team_key:   str,
     yahoo_id:   str,
+    week:       Optional[int] = None,
     db=None,
-    position:   str = "",
-    count:      int = 25,
+) -> dict:
+    """
+    Fetch the current week's matchup from Yahoo scoreboard.
+    Returns opponent, record, projected and actual points for both sides.
+    Falls back to {} gracefully so the frontend never breaks.
+    """
+    try:
+        week_param = f";week={week}" if week else ""
+        data = await yahoo_api_request(
+            f"league/{league_key}/scoreboard{week_param}", yahoo_id, db,
+        )
+
+        scoreboard    = (
+            data.get("fantasy_content", {})
+                .get("league", [{}])[1]
+                .get("scoreboard", {})
+        )
+        matchups_raw  = scoreboard.get("0", {}).get("matchups", {})
+        matchup_count = int(matchups_raw.get("count", 0))
+
+        for i in range(matchup_count):
+            matchup     = matchups_raw.get(str(i), {}).get("matchup", {})
+            teams_block = matchup.get("0", {}).get("teams", {})
+            team_count  = int(teams_block.get("count", 0))
+
+            team_entries = []
+            for j in range(team_count):
+                t_wrapper = teams_block.get(str(j), {}).get("team", [])
+                t_meta    = t_wrapper[0] if len(t_wrapper) > 0 else []
+                t_points  = t_wrapper[1] if len(t_wrapper) > 1 else {}
+
+                t_info = {}
+                for item in t_meta:
+                    if isinstance(item, dict):
+                        t_info.update(item)
+                    if isinstance(item, list):
+                        for sub in item:
+                            if isinstance(sub, dict):
+                                t_info.update(sub)
+
+                team_points = t_points.get("team_points", {})
+                team_proj   = t_points.get("team_projected_points", {})
+                team_entries.append({
+                    "team_key":         t_info.get("team_key", ""),
+                    "name":             t_info.get("name", "Unknown"),
+                    "wins":             t_info.get("wins", 0),
+                    "losses":           t_info.get("losses", 0),
+                    "actual_points":    float(team_points.get("total", 0) or 0),
+                    "projected_points": float(team_proj.get("total", 0) or 0),
+                })
+
+            my_entry  = next((t for t in team_entries if t["team_key"] == team_key), None)
+            opp_entry = next((t for t in team_entries if t["team_key"] != team_key), None)
+
+            if my_entry and opp_entry:
+                return {
+                    "week":               matchup.get("week", 0),
+                    "status":             matchup.get("status", "upcoming"),
+                    "my_team":            my_entry["name"],
+                    "my_projected":       my_entry["projected_points"],
+                    "my_actual":          my_entry["actual_points"],
+                    "my_record":          f"{my_entry['wins']}-{my_entry['losses']}",
+                    "opponent":           opp_entry["name"],
+                    "opponent_projected": opp_entry["projected_points"],
+                    "opponent_actual":    opp_entry["actual_points"],
+                    "opponent_record":    f"{opp_entry['wins']}-{opp_entry['losses']}",
+                }
+        return {}
+
+    except Exception as e:
+        print(f"get_current_matchup error: {e}")
+        return {}
+
+
+async def get_free_agents(
+    league_key: str, yahoo_id: str, db=None, position: str = "", count: int = 25,
 ) -> list:
     try:
         pos_filter = f";position={position}" if position else ""
         endpoint   = (
-            f"league/{league_key}/players"
-            f";status=A"
-            f"{pos_filter}"
-            f";sort=OR"
-            f";sort_type=season"
-            f";count={count}"
-            f"/percent_owned"
+            f"league/{league_key}/players;status=A{pos_filter}"
+            f";sort=OR;sort_type=season;count={count}/percent_owned"
         )
-
         data        = await yahoo_api_request(endpoint, yahoo_id, db)
         players     = []
         players_raw = (
@@ -486,14 +431,12 @@ async def get_free_agents(
                 .get("league", [{}])[1]
                 .get("players", {})
         )
-
         total = int(players_raw.get("count", 0))
 
         for i in range(total):
-            p_wrapper      = players_raw.get(str(i), {}).get("player", [])
+            p_wrapper = players_raw.get(str(i), {}).get("player", [])
             if not p_wrapper:
                 continue
-
             p_meta         = p_wrapper[0] if len(p_wrapper) > 0 else []
             p_percent_data = p_wrapper[1] if len(p_wrapper) > 1 else {}
 
@@ -518,12 +461,9 @@ async def get_free_agents(
                             except (ValueError, TypeError):
                                 ownership_pct = 0.0
 
-            raw_status = player_info.get("status", "")
-            status_map = {
-                "Q": "Questionable", "D": "Doubtful", "O": "Out",
-                "IR": "IR", "PUP": "PUP", "NA": "NA",
-            }
-            status = status_map.get(raw_status, "Active")
+            status_map = {"Q": "Questionable", "D": "Doubtful", "O": "Out",
+                          "IR": "IR", "PUP": "PUP", "NA": "NA"}
+            status = status_map.get(player_info.get("status", ""), "Active")
 
             players.append({
                 "player_key":    player_info.get("player_key", ""),
@@ -539,7 +479,6 @@ async def get_free_agents(
 
         players.sort(key=lambda p: p["ownership_pct"], reverse=True)
         return players
-
     except Exception as e:
         print(f"get_free_agents error (returning []): {e}")
         return []
@@ -549,23 +488,19 @@ async def get_pending_trades(league_key: str, team_key: str, yahoo_id: str, db=N
     try:
         data = await yahoo_api_request(
             f"league/{league_key}/transactions;types=pending_trade;team_key={team_key}",
-            yahoo_id,
-            db,
+            yahoo_id, db,
         )
-
         transactions = (
             data.get("fantasy_content", {})
                 .get("league", [{}])[1]
                 .get("transactions", {})
         )
-
         trades = []
         count  = int(transactions.get("count", 0))
 
         for i in range(count):
             txn  = transactions.get(str(i), {}).get("transaction", [{}])
             meta = txn[0] if txn else {}
-
             players_block = {}
             if len(txn) > 1:
                 players_block = txn[1].get("players", {})
@@ -573,8 +508,8 @@ async def get_pending_trades(league_key: str, team_key: str, yahoo_id: str, db=N
             proposer = meta.get("trader_team_name", "Opponent")
             giving   = []
             getting  = []
-
             player_count = int(players_block.get("count", 0))
+
             for j in range(player_count):
                 p_data     = players_block.get(str(j), {}).get("player", [])
                 p_meta     = p_data[0] if p_data else []
@@ -583,10 +518,7 @@ async def get_pending_trades(league_key: str, team_key: str, yahoo_id: str, db=N
                     txn_list   = p_data[1].get("transaction_data", [{}])
                     p_txn_data = txn_list[0] if txn_list else {}
 
-                name       = ""
-                position   = ""
-                team       = ""
-                player_key = ""
+                name = position = team = player_key = ""
                 for item in p_meta:
                     if isinstance(item, dict):
                         name       = item.get("full_name", name)
@@ -599,12 +531,9 @@ async def get_pending_trades(league_key: str, team_key: str, yahoo_id: str, db=N
 
                 dest_team_key = p_txn_data.get("destination_team_key", "")
                 player_entry  = {
-                    "name":       name,
-                    "position":   position,
-                    "team":       team.upper() if team else "",
-                    "player_key": player_key,
+                    "name": name, "position": position,
+                    "team": team.upper() if team else "", "player_key": player_key,
                 }
-
                 if dest_team_key == team_key:
                     getting.append(player_entry)
                 else:
@@ -616,9 +545,7 @@ async def get_pending_trades(league_key: str, team_key: str, yahoo_id: str, db=N
                 "giving":   giving,
                 "getting":  getting,
             })
-
         return trades
-
     except Exception as e:
         print(f"get_pending_trades error (returning []): {e}")
         return []
@@ -626,11 +553,7 @@ async def get_pending_trades(league_key: str, team_key: str, yahoo_id: str, db=N
 
 def normalize_scoring_format(yahoo_scoring_type: str) -> str:
     mapping = {
-        "headppr":  "PPR",
-        "headhalf": "Half",
-        "head":     "Standard",
-        "ppr":      "PPR",
-        "half":     "Half",
-        "standard": "Standard",
+        "headppr": "PPR", "headhalf": "Half", "head": "Standard",
+        "ppr": "PPR", "half": "Half", "standard": "Standard",
     }
     return mapping.get(yahoo_scoring_type.lower(), "PPR")

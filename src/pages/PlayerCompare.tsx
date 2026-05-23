@@ -13,15 +13,17 @@ import {
   CircularProgress,
   TextField,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import PlayerCompareCard from '../components/PlayerCompareCard';
-import { mockRoster } from '../data/mockData';
+import AddIcon            from '@mui/icons-material/Add';
+import PlayerCompareCard  from '../components/PlayerCompareCard';
+import { mockRoster }     from '../data/mockData';
 import { NFL_TEAMS, dstToPlayer } from '../data/nflTeams';
-import { useScoring } from '../hooks/useScoring';
+import { useScoring }     from '../hooks/useScoring';
+import { useRoster }      from '../hooks/useRoster';
 import { usePlayers, toPlayer } from '../hooks/usePlayers';
-import ModeSelector from '../components/ModeSelector';
-import { useSettings } from '../context/SettingsContext';
-import type { Player } from '../types/index';
+import ModeSelector       from '../components/ModeSelector';
+import { useSettings }    from '../context/SettingsContext';
+import { useYahooStatus } from '../hooks/useYahoo';
+import type { Player }    from '../types/index';
 import type { SleeperPlayer } from '../hooks/usePlayers';
 
 type PositionFilter = 'ALL' | 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DST';
@@ -38,6 +40,13 @@ const getGridColumns = (count: number): string => {
 
 const PlayerCompare = () => {
   const { scoringFormat, scoringMode, setScoringFormat, setScoringMode } = useSettings();
+  const { connected, sessionExpired } = useYahooStatus();
+  const selectedLeagueKey = localStorage.getItem('selected_league_key') || '';
+
+  // Pull league scoring from the same useRoster hook used everywhere else
+  // leagueScoring is null until fetched (cached after first load)
+  const { leagueScoring } = useRoster(connected, sessionExpired, selectedLeagueKey, scoringFormat);
+
   const [comparedPlayers, setComparedPlayers] = useState<Player[]>([
     mockRoster.starters[3],
     mockRoster.starters[4],
@@ -47,10 +56,13 @@ const PlayerCompare = () => {
   const [inputValue, setInputValue]         = useState('');
 
   const { results, loading: searchLoading, search, clearResults } = usePlayers();
-  const { scoredPlayers, loading: scoreLoading, error, topPick }  = useScoring(
+
+  // Pass leagueScoring so scores reflect actual league rules
+  const { scoredPlayers, loading: scoreLoading, error, topPick } = useScoring(
     comparedPlayers,
     scoringFormat,
-    scoringMode
+    scoringMode,
+    leagueScoring,
   );
 
   const searchOptions = useMemo((): (SleeperPlayer | Player)[] => {
@@ -66,9 +78,7 @@ const PlayerCompare = () => {
     }
 
     if (positionFilter === 'ALL') {
-      const sleeperResults = results.filter(
-        (p) => !alreadyAdded.includes(parseInt(p.id))
-      );
+      const sleeperResults = results.filter((p) => !alreadyAdded.includes(parseInt(p.id)));
       const dstMatches: Player[] = inputValue
         ? dstPool.filter((p) => {
             if (alreadyAdded.includes(p.id)) return false;
@@ -111,15 +121,8 @@ const PlayerCompare = () => {
     clearResults();
   };
 
-  const handleRemove = (id: number) => {
-    setComparedPlayers((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  const handleToggleLock = (id: number) => {
-    setComparedPlayers((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isLocked: !p.isLocked } : p))
-    );
-  };
+  const handleRemove       = (id: number) => setComparedPlayers((prev) => prev.filter((p) => p.id !== id));
+  const handleToggleLock   = (id: number) => setComparedPlayers((prev) => prev.map((p) => p.id === id ? { ...p, isLocked: !p.isLocked } : p));
 
   const getOptionLabel = (option: SleeperPlayer | Player): string => {
     if ('position' in option && option.position === 'DST') {
@@ -134,22 +137,22 @@ const PlayerCompare = () => {
 
       {/* Header */}
       <Box sx={{ mb: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          Player Compare
-        </Typography>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>Player Compare</Typography>
         <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 0.5 }}>
           Compare up to 5 players · QB, RB, WR, TE, K, D/ST supported
+          {leagueScoring && (
+            <Box component="span" sx={{ ml: 1, color: 'primary.main', fontWeight: 600 }}>
+              · League rules active
+            </Box>
+          )}
         </Typography>
       </Box>
 
-      {/* Error */}
       {error && (
-        <Alert severity="warning" sx={{ mb: 2, fontSize: 13 }}>
-          {error}
-        </Alert>
+        <Alert severity="warning" sx={{ mb: 2, fontSize: 13 }}>{error}</Alert>
       )}
 
-      {/* Settings row — full width */}
+      {/* Controls */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <FormControl size="small" sx={{ minWidth: 110 }}>
           <InputLabel>Format</InputLabel>
@@ -189,7 +192,7 @@ const PlayerCompare = () => {
         <ModeSelector mode={scoringMode} onChange={setScoringMode} />
       </Box>
 
-      {/* Search + add — full width */}
+      {/* Search */}
       <Box sx={{ display: 'flex', gap: 1, mb: 3, alignItems: 'center' }}>
         <Autocomplete
           value={searchValue}
@@ -206,11 +209,9 @@ const PlayerCompare = () => {
           filterOptions={(x) => x}
           isOptionEqualToValue={(option, value) => {
             const optId = 'position' in option && option.position === 'DST'
-              ? (option as Player).id
-              : parseInt((option as SleeperPlayer).id);
+              ? (option as Player).id : parseInt((option as SleeperPlayer).id);
             const valId = 'position' in value && value.position === 'DST'
-              ? (value as Player).id
-              : parseInt((value as SleeperPlayer).id);
+              ? (value as Player).id : parseInt((value as SleeperPlayer).id);
             return optId === valId;
           }}
           loading={searchLoading}
@@ -219,23 +220,13 @@ const PlayerCompare = () => {
             <TextField
               {...params}
               size="small"
-              placeholder={
-                positionFilter === 'DST'
-                  ? 'Search or select a D/ST...'
-                  : 'Search any NFL player or D/ST...'
-              }
+              placeholder={positionFilter === 'DST' ? 'Search or select a D/ST...' : 'Search any NFL player or D/ST...'}
               sx={{ bgcolor: 'background.paper' }}
             />
           )}
           sx={{ flex: 1 }}
           disabled={comparedPlayers.length >= 5}
-          noOptionsText={
-            inputValue.length < 1
-              ? 'Start typing to search...'
-              : positionFilter === 'DST'
-              ? 'No D/ST found'
-              : 'No players found'
-          }
+          noOptionsText={inputValue.length < 1 ? 'Start typing to search...' : positionFilter === 'DST' ? 'No D/ST found' : 'No players found'}
         />
         <Button
           variant="contained"
@@ -249,31 +240,23 @@ const PlayerCompare = () => {
         </Button>
       </Box>
 
-      {/* Verdict banner — full width */}
+      {/* Verdict banner */}
       {topPlayer && (
         <Box
           sx={{
-            bgcolor: 'primary.main',
+            bgcolor:      'primary.main',
             borderRadius: 3,
-            px: 2,
-            py: 1.5,
-            mb: 2,
-            display: 'flex',
+            px:           2,
+            py:           1.5,
+            mb:           2,
+            display:      'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems:   'center',
           }}
         >
           <Box>
-            <Typography
-              sx={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: '#000',
-                textTransform: 'uppercase',
-                letterSpacing: 1,
-              }}
-            >
-              {scoreLoading ? 'Calculating...' : `Top Pick · ${scoringFormat} · ${scoringMode}`}
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#000', textTransform: 'uppercase', letterSpacing: 1 }}>
+              {scoreLoading ? 'Calculating...' : `Top Pick · ${scoringFormat} · ${scoringMode}${leagueScoring ? ' · League Rules' : ''}`}
             </Typography>
             <Typography sx={{ fontSize: 20, fontWeight: 700, color: '#000' }}>
               {scoreLoading ? '...' : topPick ?? topPlayer.name}
@@ -294,15 +277,12 @@ const PlayerCompare = () => {
 
       <Divider sx={{ mb: 2 }} />
 
-      {/* Player cards — responsive grid based on count */}
+      {/* Player cards */}
       {comparedPlayers.length > 0 && (
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: {
-              xs: '1fr',
-              md: getGridColumns(sortedPlayers.length),
-            },
+            gridTemplateColumns: { xs: '1fr', md: getGridColumns(sortedPlayers.length) },
             gap: 2,
             alignItems: 'stretch',
           }}
@@ -321,14 +301,12 @@ const PlayerCompare = () => {
         </Box>
       )}
 
-      {/* Max players notice */}
       {comparedPlayers.length >= 5 && (
         <Typography sx={{ mt: 2, fontSize: 12, color: 'text.secondary', textAlign: 'center' }}>
           Maximum of 5 players reached — remove one to add another.
         </Typography>
       )}
 
-      {/* Empty state */}
       {comparedPlayers.length === 0 && (
         <Box sx={{ textAlign: 'center', py: 6 }}>
           <Typography sx={{ fontSize: 32, mb: 1 }}>⚖️</Typography>

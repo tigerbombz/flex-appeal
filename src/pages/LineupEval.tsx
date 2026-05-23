@@ -10,19 +10,18 @@ import { useLineup }          from '../hooks/useLineup';
 import { useRoster }          from '../hooks/useRoster';
 import { useSettings }        from '../context/SettingsContext';
 import { useYahooStatus }     from '../hooks/useYahoo';
+import { mockRoster, mockLeague } from '../data/mockData';
 import type { ScoringFormat } from '../utils/scoring';
 
 const LineupEval = () => {
   const { scoringFormat, scoringMode, setScoringFormat, setScoringMode } = useSettings();
   const { connected, sessionExpired } = useYahooStatus();
 
-  // Pull the selected league key — set during onboarding in LeagueSelector
   const selectedLeagueKey = localStorage.getItem('selected_league_key') || '';
 
-  // Real roster with league scoring settings baked in
   const {
-    starters,
-    bench,
+    starters:     rosterStarters,
+    bench:        rosterBench,
     isRealData,
     loading:      rosterLoading,
     error:        rosterError,
@@ -33,20 +32,28 @@ const LineupEval = () => {
     leagueScoring,
   } = useRoster(connected, sessionExpired, selectedLeagueKey, scoringFormat);
 
-  // Lineup evaluation — re-runs whenever roster or league scoring changes
+  // Always have players to evaluate — fall back to mock if real roster not loaded
+  const starters = rosterStarters.length ? rosterStarters : mockRoster.starters;
+  const bench    = rosterBench.length    ? rosterBench    : mockRoster.bench;
+  const activeWeek   = week   || mockLeague.week;
+  const activeSeason = season || '2025';
+
   const { result, loading: evalLoading, error: evalError } = useLineup(
     starters,
     bench,
     scoringFormat,
     scoringMode,
-    week,
-    season,
+    activeWeek,
+    activeSeason,
     leagueKey,
-    leagueScoring,    // null falls back to generic format boosts — safe
+    leagueScoring,
   );
 
   const loading = rosterLoading || evalLoading;
-  const error   = rosterError   || evalError;
+
+  // Only show the eval error if we're on real data — mock failures are expected
+  // when the backend lineup endpoint isn't running locally
+  const showError = evalError && isRealData;
 
   return (
     <Box sx={{ p: 2 }}>
@@ -58,8 +65,8 @@ const LineupEval = () => {
         </Typography>
         <Typography sx={{ color: 'text.secondary', fontSize: 13, mt: 0.5 }}>
           {isRealData
-            ? `${leagueName} · Week ${week} · Starters vs Bench`
-            : `Week ${week} · Starters vs Bench · Includes K and D/ST`}
+            ? `${leagueName} · Week ${activeWeek} · Starters vs Bench`
+            : `Week ${activeWeek} · Starters vs Bench · Includes K and D/ST`}
           {leagueScoring && (
             <Box component="span" sx={{ ml: 1, color: 'primary.main', fontWeight: 600 }}>
               · League rules active
@@ -104,17 +111,24 @@ const LineupEval = () => {
         </Typography>
       </Box>
 
-      {/* Mock data notice */}
+      {/* Mock data notice — info only, not an error */}
       {!isRealData && !rosterLoading && (
         <Alert severity="info" sx={{ mb: 2, fontSize: 12 }}>
           Showing sample data — connect Yahoo and select a league to evaluate your real roster
         </Alert>
       )}
 
-      {/* Error */}
-      {error && (
+      {/* Roster error (real data only) */}
+      {rosterError && (
+        <Alert severity="warning" sx={{ mb: 2, fontSize: 12 }}>
+          {rosterError}
+        </Alert>
+      )}
+
+      {/* Eval error — only shown when on real data so mock failures are silent */}
+      {showError && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
+          {evalError}
         </Alert>
       )}
 
@@ -166,7 +180,7 @@ const LineupEval = () => {
 
           <Typography sx={{ mt: 3, fontSize: 12, color: 'text.secondary', textAlign: 'center', lineHeight: 1.6, px: 2 }}>
             {leagueScoring
-              ? 'Scored using your league\'s actual rules · Vegas props · Team totals · Usage · Trend · Matchup'
+              ? "Scored using your league's actual rules · Vegas props · Team totals · Usage · Trend · Matchup"
               : 'Position-specific weights · Vegas props · Team totals · Usage · Trend · Matchup'
             }
             {'. '}Always apply your own judgment — this is a decision aid, not gospel.
