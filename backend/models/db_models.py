@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean,
-    DateTime, ForeignKey, JSON, Text
+    DateTime, ForeignKey, JSON, Text, Date, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -136,3 +136,17 @@ class WeeklyMatchup(Base):
     created_at        = Column(DateTime, server_default=func.now())
 
     team              = relationship("Team", back_populates="weekly_matchups")
+
+# Tracks per-user daily AI usage. One row per user per day.
+# Resets automatically — no cron needed, just date-based.
+class AIUsage(Base):
+    __tablename__ = "ai_usage"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    user_id       = Column(Integer, ForeignKey("users.id"), nullable=False)
+    date          = Column(Date, nullable=False)
+    request_count = Column(Integer, nullable=False, default=0)
+    created_at    = Column(DateTime, server_default=func.now())
+    updated_at    = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (UniqueConstraint("user_id", "date", name="uq_ai_usage_user_date"),)

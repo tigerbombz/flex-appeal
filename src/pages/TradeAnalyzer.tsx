@@ -106,8 +106,12 @@ const TradeAnalyzer = () => {
       });
       setResult(data.analysis);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to analyze trade');
-    } finally {
+        if (err?.response?.status === 429) {
+            setError("You've hit your 50 AI requests for today. Resets at midnight!");
+        } else {
+            setError(err?.response?.data?.detail || 'Failed to analyze trade');
+        }
+        } finally {
       setLoading(false);
     }
   };

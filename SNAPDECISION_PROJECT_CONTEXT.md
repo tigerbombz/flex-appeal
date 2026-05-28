@@ -19,8 +19,8 @@ Full-stack fantasy football decision support app.
 - LineupEval.tsx — real Yahoo roster via useRoster; league scoring settings active; slot-by-slot eval with mode toggle; "League rules active" badge; mock info banner when Yahoo not connected
 - PlayerCompare.tsx — compare up to 5 players; leagueScoring from useRoster passed to useScoring; "League rules active" badge; Sleeper player search
 - Settings.tsx — Yahoo status, scoring format/mode, engine accuracy, Sync Week UI (league + week selector, Sync button, feedback), logout
-- TradeAnalyzer.tsx — AI trade evaluation via Claude; leagueScoring passed to Claude payload; real Yahoo roster via useRoster; pending trades banner; freeSolo autocomplete
-- WaiverAssistant.tsx — AI waiver recommendations via Claude; leagueScoring passed to Claude payload; real Yahoo roster; real free agents from Yahoo; quick-tap chips; mock pool fallback offseason
+- TradeAnalyzer.tsx — AI trade evaluation via Claude; leagueScoring passed to Claude payload; real Yahoo roster via useRoster; pending trades banner; freeSolo autocomplete; 429 rate limit error handling
+- WaiverAssistant.tsx — AI waiver recommendations via Claude; leagueScoring passed to Claude payload; real Yahoo roster; real free agents from Yahoo; quick-tap chips; mock pool fallback offseason; 429 rate limit error handling
 - Landing.tsx — sign in page shown when VITE_AUTH_ENABLED=true and not logged in
 
 ### Components
@@ -100,7 +100,7 @@ Bottom nav tabs (5 visible):
 - models/player.py — Pydantic: PlayerInput, PlayerScore, LeagueScoring (per-stat point values),
   ScoreRequest (accepts optional leagueScoring), enums
 - models/db_models.py — SQLAlchemy ORM: users, leagues, teams, roster_players,
-  player_stats, lineup_evaluations, weekly_matchups
+  player_stats, lineup_evaluations, weekly_matchups, ai_usage
 - models/user_repository.py — DB ops: get_or_create_user, save_tokens,
   get_active_token, get_refresh_token, get_first_user
 
@@ -118,8 +118,9 @@ Bottom nav tabs (5 visible):
   get_current_matchup() (scoreboard: opponent, record, projected, actual pts)
 - backtest_service.py — log_lineup_evaluation(), log_actual_points(), get_backtest_summary()
 - stats_service.py — Sleeper stats: get_week_stats(), calc_fantasy_points(), get_points_last_three()
-- ai_service.py — AsyncAnthropic client, rate limiter, build_roster_context(),
-  analyze_trade(), analyze_waiver_wire(). Model: claude-haiku-4-5-20251001
+- ai_service.py — AsyncAnthropic client, check_and_increment_usage() (per-user DB rate limiter),
+  get_usage_today(), build_roster_context(), analyze_trade(), analyze_waiver_wire().
+  Model: claude-haiku-4-5-20251001. league_scoring passed to both analyze functions.
 
 ### Routers
 - routers/odds.py — GET /api/odds/events, /totals, /props/{id}
@@ -135,7 +136,9 @@ Bottom nav tabs (5 visible):
   POST /sync-week (Yahoo points + was_followed auto-set),
   POST /actual-points (single override), POST /actual-points/bulk, GET /history
 - routers/stats.py — GET /api/stats/week, POST /points-last-three/bulk, GET /current-season
-- routers/ai.py — POST /api/ai/trade (accepts league_scoring), POST /api/ai/waiver (accepts league_scoring), GET /api/ai/status
+- routers/ai.py — POST /api/ai/trade (per-user rate limit, league_scoring passthrough),
+  POST /api/ai/waiver (per-user rate limit, league_scoring passthrough),
+  GET /api/ai/status (returns user's requests_today, requests_left, requests_limit)
 
 ### Utils
 - utils/season.py — get_current_season(), get_current_week() (0 if offseason)
@@ -155,6 +158,8 @@ Bottom nav tabs (5 visible):
 - lineup_evaluations — team_id FK, week, slot, recommendation, scores,
   was_followed, actual_pts (for backtesting)
 - weekly_matchups — team_id FK, week, result, points_for, points_against
+- ai_usage — user_id FK, date, request_count; unique on (user_id, date);
+  auto-created on Railway deploy via init_db(); resets daily — no cron needed
 
 ## Scoring Engine Details
 Position-specific weights: QB(teamTotal 35%, prop 25%, usage 20%),
@@ -180,6 +185,15 @@ Cleared on logout and Yahoo reconnect. Falls back to PPR defaults if fetch fails
 - GET /api/backtest/summary — swap/keep/overall accuracy, avg swap gain, aggregates leagues
 - team_id always resolved from user_id + league_key join, never hardcoded
 
+## AI Rate Limiting
+- Per-user daily limit tracked in ai_usage table (not in-memory)
+- Each Yahoo user gets their own 50/day bucket — users never share the limit
+- Resets automatically at midnight — date-based, no cron needed
+- check_and_increment_usage(user_id, db) called before every Claude API call
+- get_usage_today(user_id, db) powers the /api/ai/status endpoint
+- Router uses get_first_user() for now — one-line swap when multi-user goes live
+- Frontend shows friendly "Resets at midnight" message on 429
+
 ## Auth Flow
 VITE_AUTH_ENABLED=true → show Landing if no user.
 Yahoo OAuth → callback saves token to DB → redirect with ?yahoo_connected=true
@@ -190,8 +204,15 @@ Logout clears localStorage + AuthContext + league settings cache → returns to 
 ## Deployment
 - Vercel: auto-deploys on git push to main, runs npm run build
 - Railway: auto-deploys on git push, runs uvicorn main:app
+- ai_usage table auto-created on next Railway deploy via init_db() — no manual migration needed
 
-## Current Status
+## Paywall Flag
+AI features have a paywall stub ready but disabled:
+- AI_PAYWALL_ENABLED boolean — set to false until ready to monetize
+- When enabled: add is_pro column to users table, check in get_current_user_id dependency
+- No rearchitecting needed — one flag flip to activate
+
+## Completed ✅
 ✅ Auth flow with landing page and route protection
 ✅ League selector with auto scoring format from Yahoo
 ✅ Real Yahoo roster with mock data fallback
@@ -237,6 +258,14 @@ Logout clears localStorage + AuthContext + league settings cache → returns to 
   ✅ TradeAnalyzer passes leagueScoring to analyze_trade()
   ✅ WaiverAssistant passes leagueScoring to analyze_waiver_wire()
   ✅ Claude now gives advice specific to 6pt TD leagues, first down leagues, etc.
+✅ Per-user AI rate limiting
+  ✅ Replaced global in-memory counter with per-user PostgreSQL tracking
+  ✅ ai_usage table: user_id + date unique constraint, auto-resets daily
+  ✅ check_and_increment_usage() called before every Claude API call
+  ✅ get_usage_today() powers live usage in /api/ai/status
+  ✅ league_scoring passthrough fixed in both AI routes
+  ✅ Frontend 429 handling with "Resets at midnight" message
+  ✅ ai_usage table auto-created on Railway deploy — no manual migration
 
 ## Pending / Next Steps
 - [ ] Test pending trades with a live Yahoo league
@@ -245,5 +274,8 @@ Logout clears localStorage + AuthContext + league settings cache → returns to 
 - [ ] Test get_current_matchup with an active league
 - [ ] When season starts: real Odds API props flow to scoring engine automatically
 - [ ] Future: automate sync-week via Railway cron (Tuesday 10am)
-- [ ] Future: paywall for AI features, push notifications for lineup reminders
+- [ ] Future: paywall for AI features (AI_PAYWALL_ENABLED flag + is_pro on users table)
+- [ ] Future: push notifications for lineup reminders
+- [ ] Future: streaming Claude responses for snappier AI UX
 - [ ] Future: add league_key + team_key columns to users table for faster lookups
+- [ ] Future: swap get_first_user() for session-based lookup when multi-user goes live

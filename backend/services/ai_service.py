@@ -1,28 +1,50 @@
 import os
 import json
 from anthropic import AsyncAnthropic
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from models.db_models import AIUsage
 
 client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-# Simple in-memory rate limiter
-_request_counts: dict = {}
-MAX_REQUESTS_PER_DAY  = int(os.getenv("MAX_AI_REQUESTS_PER_DAY", "50"))
+MAX_REQUESTS_PER_USER_PER_DAY = int(os.getenv("MAX_AI_REQUESTS_PER_DAY", "50"))
 
-def check_rate_limit() -> bool:
+async def check_and_increment_usage(user_id: int, db: AsyncSession) -> bool:
     """
-    Simple daily rate limit to prevent runaway costs.
-    Returns True if request is allowed, False if limit exceeded.
+    Check if user is under their daily AI limit and increment if so.
+    Returns True if the request is allowed, False if limit is exceeded.
+    One row per user per day in ai_usage table — resets automatically at midnight.
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    count = _request_counts.get(today, 0)
+    today = date.today()
 
-    if count >= MAX_REQUESTS_PER_DAY:
+    result = await db.execute(
+        select(AIUsage).where(AIUsage.user_id == user_id, AIUsage.date == today)
+    )
+    usage = result.scalar_one_or_none()
+
+    if usage is None:
+        # First request today — create a new row
+        db.add(AIUsage(user_id=user_id, date=today, request_count=1))
+        await db.commit()
+        return True
+
+    if usage.request_count >= MAX_REQUESTS_PER_USER_PER_DAY:
         return False
 
-    _request_counts[today] = count + 1
+    usage.request_count += 1
+    await db.commit()
     return True
+
+async def get_usage_today(user_id: int, db: AsyncSession) -> int:
+    """Returns how many AI requests this user has made today."""
+    today = date.today()
+    result = await db.execute(
+        select(AIUsage).where(AIUsage.user_id == user_id, AIUsage.date == today)
+    )
+    usage = result.scalar_one_or_none()
+    return usage.request_count if usage else 0
 
 def build_roster_context(
     starters:       list[dict],
@@ -30,7 +52,7 @@ def build_roster_context(
     scoring_format: str,
     scoring_mode:   str,
 ) -> str:
-    """Build a compact roster summary for Claude"""
+    """Build a compact roster summary for Claude."""
     lines = [f"Scoring: {scoring_format} | Mode: {scoring_mode}\n"]
     lines.append("STARTERS:")
     for p in starters:
@@ -59,20 +81,16 @@ async def analyze_trade(
     scoring_format:  str,
     scoring_mode:    str,
     user_notes:      Optional[str] = None,
+    league_scoring:  Optional[dict] = None,
 ) -> dict:
     """
     Analyze a trade using Claude.
     Returns structured verdict with reasoning.
+    Rate limiting is handled by the router via check_and_increment_usage().
     """
-    if not check_rate_limit():
-        return {
-            "error":   "Daily AI request limit reached. Try again tomorrow.",
-            "limited": True,
-        }
-
     roster_ctx = build_roster_context(starters, bench, scoring_format, scoring_mode)
 
-    giving_str  = ", ".join([
+    giving_str = ", ".join([
         f"{p.get('name')} ({p.get('position')}, Score:{p.get('score', 50)})"
         for p in giving_players
     ])
@@ -81,11 +99,15 @@ async def analyze_trade(
         for p in getting_players
     ])
 
+    league_rules_str = ""
+    if league_scoring:
+        league_rules_str = f"\nLEAGUE SCORING RULES:\n{json.dumps(league_scoring, indent=2)}\n"
+
     prompt = f"""You are a fantasy football expert advisor. Analyze this trade for a {scoring_format} league.
 
 MY CURRENT ROSTER:
 {roster_ctx}
-
+{league_rules_str}
 PROPOSED TRADE:
 I give: {giving_str}
 I receive: {getting_str}
@@ -109,19 +131,18 @@ Be direct and specific. Reference the actual player names and scores. Consider p
         message = await client.messages.create(
             model      = "claude-haiku-4-5-20251001",
             max_tokens = 1024,
-            messages   = [{ "role": "user", "content": prompt }]
+            messages   = [{"role": "user", "content": prompt}]
         )
 
         raw  = message.content[0].text
-        # Strip markdown code blocks if present
         raw  = raw.replace("```json", "").replace("```", "").strip()
         data = json.loads(raw)
-        return { "analysis": data, "limited": False }
+        return {"analysis": data, "limited": False}
 
     except json.JSONDecodeError as e:
-        return { "error": f"Failed to parse Claude response as JSON: {str(e)}", "limited": False }
+        return {"error": f"Failed to parse Claude response as JSON: {str(e)}", "limited": False}
     except Exception as e:
-        return { "error": str(e), "limited": False }
+        return {"error": str(e), "limited": False}
 
 async def analyze_waiver_wire(
     starters:          list[dict],
@@ -130,29 +151,29 @@ async def analyze_waiver_wire(
     scoring_format:    str,
     scoring_mode:      str,
     week:              int,
+    league_scoring:    Optional[dict] = None,
 ) -> dict:
     """
     Recommend waiver wire pickups based on roster needs.
     Returns top recommendations with reasoning.
+    Rate limiting is handled by the router via check_and_increment_usage().
     """
-    if not check_rate_limit():
-        return {
-            "error":   "Daily AI request limit reached. Try again tomorrow.",
-            "limited": True,
-        }
-
     roster_ctx = build_roster_context(starters, bench, scoring_format, scoring_mode)
 
     available_str = "\n".join([
         f"  {p.get('name')} ({p.get('position')}, {p.get('team')}) Score:{p.get('score', 50)}"
-        for p in available_players[:20]  # cap at 20 to control tokens
+        for p in available_players[:20]
     ])
+
+    league_rules_str = ""
+    if league_scoring:
+        league_rules_str = f"\nLEAGUE SCORING RULES:\n{json.dumps(league_scoring, indent=2)}\n"
 
     prompt = f"""You are a fantasy football expert advisor. It's Week {week} of the {scoring_format} season.
 
 MY CURRENT ROSTER:
 {roster_ctx}
-
+{league_rules_str}
 AVAILABLE WAIVER PLAYERS:
 {available_str}
 
@@ -179,15 +200,15 @@ Give 2-4 recommendations. Be specific about who to drop. Reference my actual ros
         message = await client.messages.create(
             model      = "claude-haiku-4-5-20251001",
             max_tokens = 1024,
-            messages   = [{ "role": "user", "content": prompt }]
+            messages   = [{"role": "user", "content": prompt}]
         )
 
         raw  = message.content[0].text
         raw  = raw.replace("```json", "").replace("```", "").strip()
         data = json.loads(raw)
-        return { "recommendations": data, "limited": False }
+        return {"recommendations": data, "limited": False}
 
     except json.JSONDecodeError as e:
-        return { "error": f"Failed to parse Claude response as JSON: {str(e)}", "limited": False }
+        return {"error": f"Failed to parse Claude response as JSON: {str(e)}", "limited": False}
     except Exception as e:
-        return { "error": str(e), "limited": False }
+        return {"error": str(e), "limited": False}
