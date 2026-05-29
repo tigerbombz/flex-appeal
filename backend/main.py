@@ -18,7 +18,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o for o in origins if o],
-    allow_credentials=True,
+    allow_credentials=True,   # required for cookies to be sent cross-origin
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -39,8 +39,8 @@ async def startup():
 
 @app.get("/")
 def root():
-    return { "message": "SnapDecision API is running" }
+    return {"message": "SnapDecision API is running"}
 
 @app.get("/health")
 def health():
-    return { "status": "ok" }
+    return {"status": "ok"}

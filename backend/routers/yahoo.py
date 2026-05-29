@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -14,12 +14,18 @@ from services.yahoo_service import (
     get_league_settings,
     get_current_matchup,
 )
-from models.user_repository import get_first_user
+from models.user_repository import get_first_user, get_user_by_yahoo_id
+from routers.ai import make_user_cookie
 import os
 
 router = APIRouter(prefix="/auth/yahoo", tags=["yahoo"])
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# Cookie config — tighten these in production
+COOKIE_MAX_AGE    = 60 * 60 * 24 * 90  # 90 days
+COOKIE_SECURE     = os.getenv("ENVIRONMENT", "development") == "production"
+COOKIE_SAMESITE   = "lax"
 
 
 @router.get("/login")
@@ -31,12 +37,35 @@ async def yahoo_login():
 async def yahoo_callback(code: str, db: AsyncSession = Depends(get_db)):
     try:
         token_data   = await exchange_code_for_token(code, db)
+        yahoo_id     = token_data.get("yahoo_id")
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-        print(f"Yahoo auth successful for user: {token_data.get('yahoo_id')}")
-        return RedirectResponse(url=f"{frontend_url}?yahoo_connected=true")
+        print(f"Yahoo auth successful for user: {yahoo_id}")
+
+        # Look up the DB user so we can stamp their real ID into the cookie
+        user = await get_user_by_yahoo_id(db, yahoo_id)
+        if not user:
+            # Shouldn't happen — exchange_code_for_token calls get_or_create_user
+            # internally, but guard just in case
+            return RedirectResponse(url=f"{frontend_url}?yahoo_error=user_not_found")
+
+        # Build a signed session cookie and attach it to the redirect response
+        cookie_value = make_user_cookie(user.id)
+        response = RedirectResponse(url=f"{frontend_url}?yahoo_connected=true")
+        response.set_cookie(
+            key      = "sd_user_id",
+            value    = cookie_value,
+            max_age  = COOKIE_MAX_AGE,
+            httponly = True,           # not readable by JS — protects against XSS
+            secure   = COOKIE_SECURE,  # HTTPS only in production
+            samesite = COOKIE_SAMESITE,
+        )
+        return response
+
     except Exception as e:
         print(f"Callback error: {str(e)}")
-        return RedirectResponse(url=f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}?yahoo_error={str(e)}")
+        return RedirectResponse(
+            url=f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}?yahoo_error={str(e)}"
+        )
 
 
 @router.get("/status")
@@ -205,6 +234,18 @@ async def fetch_pending_trades(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         print(f"fetch_pending_trades error: {e}")
         return {"trades": []}
+
+
+@router.get("/logout")
+async def yahoo_logout(response: Response):
+    """Clear the session cookie on logout."""
+    response.delete_cookie(
+        key      = "sd_user_id",
+        httponly = True,
+        secure   = COOKIE_SECURE,
+        samesite = COOKIE_SAMESITE,
+    )
+    return {"logged_out": True}
 
 
 @router.get("/debug")

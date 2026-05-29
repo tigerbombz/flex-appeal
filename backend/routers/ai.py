@@ -1,10 +1,14 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Cookie, Request
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+import hmac
+import hashlib
 
 from database import get_db
+from models.db_models import User
 from models.user_repository import get_first_user
 from services.ai_service import (
     analyze_trade,
@@ -16,15 +20,58 @@ from services.ai_service import (
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
-# ─── Shared dependency — resolves Yahoo user from DB ─────────────────────────
-# Uses get_first_user for now (works perfectly while it's just you).
-# When you open to multiple users, swap this for a session/token-based lookup —
-# that's a one-line change here and nothing else needs to change.
-async def get_current_user_id(db: AsyncSession = Depends(get_db)) -> int:
+# ─── Cookie-based user resolution ────────────────────────────────────────────
+# Signs user_id with SECRET_KEY so the cookie can't be tampered with.
+# Falls back to get_first_user() if no cookie is present — this keeps
+# everything working exactly as before for your solo use, and works correctly
+# the moment a second user logs in via their own OAuth flow.
+
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
+
+def _sign(value: str) -> str:
+    return hmac.new(SECRET_KEY.encode(), value.encode(), hashlib.sha256).hexdigest()
+
+def _make_cookie_value(user_id: int) -> str:
+    payload = str(user_id)
+    return f"{payload}.{_sign(payload)}"
+
+def _verify_cookie(cookie_value: str) -> Optional[int]:
+    try:
+        payload, sig = cookie_value.rsplit(".", 1)
+        if hmac.compare_digest(_sign(payload), sig):
+            return int(payload)
+    except Exception:
+        pass
+    return None
+
+def make_user_cookie(user_id: int) -> str:
+    """Call this in yahoo_callback to get the cookie string to set."""
+    return _make_cookie_value(user_id)
+
+async def get_current_user_id(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> int:
+    """
+    Resolves the current user from the signed session cookie.
+    Falls back to get_first_user() when no cookie exists — so solo use
+    keeps working without any changes to the frontend.
+    """
+    cookie_value = request.cookies.get("sd_user_id")
+
+    if cookie_value:
+        user_id = _verify_cookie(cookie_value)
+        if user_id is not None:
+            return user_id
+        # Cookie present but invalid/tampered — reject it
+        raise HTTPException(status_code=401, detail="Invalid session. Please reconnect Yahoo.")
+
+    # No cookie — fall back to first user (solo mode)
     user = await get_first_user(db)
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return user.id
+
 
 # ─── Request models ───────────────────────────────────────────────────────────
 class PlayerSummary(BaseModel):
@@ -80,6 +127,7 @@ class WaiverRequest(BaseModel):
     week:              int = 1
     league_scoring:    Optional[LeagueScoring] = None
 
+
 # ─── Routes ───────────────────────────────────────────────────────────────────
 @router.post("/trade")
 async def trade_analyzer(
@@ -114,6 +162,7 @@ async def trade_analyzer(
 
     return result
 
+
 @router.post("/waiver")
 async def waiver_advisor(
     request: WaiverRequest,
@@ -145,6 +194,7 @@ async def waiver_advisor(
         raise HTTPException(status_code=500, detail=result["error"])
 
     return result
+
 
 @router.get("/status")
 async def ai_status(

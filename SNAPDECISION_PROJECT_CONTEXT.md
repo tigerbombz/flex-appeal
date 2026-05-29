@@ -102,7 +102,7 @@ Bottom nav tabs (5 visible):
 - models/db_models.py — SQLAlchemy ORM: users, leagues, teams, roster_players,
   player_stats, lineup_evaluations, weekly_matchups, ai_usage
 - models/user_repository.py — DB ops: get_or_create_user, save_tokens,
-  get_active_token, get_refresh_token, get_first_user
+  get_active_token, get_refresh_token, get_first_user, get_user_by_yahoo_id
 
 ### Services
 - scoring_service.py — core engine: position weights, mode adjustments,
@@ -128,17 +128,19 @@ Bottom nav tabs (5 visible):
 - routers/lineup.py — POST /api/lineup/evaluate (accepts league_key, resolves team_id from DB,
   accepts leagueScoring, logs to DB), /flex
 - routers/sleeper.py — GET /api/players/nfl, DELETE /api/players/nfl/cache
-- routers/yahoo.py — GET /auth/yahoo/login, /callback, /status, /leagues,
-  /league-settings/{league_key}, /team/{league_key}, /roster/{league_key}/{team_key},
+- routers/yahoo.py — GET /auth/yahoo/login, /callback (sets sd_user_id signed cookie),
+  /status, /leagues, /league-settings/{league_key}, /team/{league_key},
+  /roster/{league_key}/{team_key},
   /matchup/{league_key} (current week matchup, graceful null fallback),
-  /free-agents/{league_key}, /trades/pending (all leagues), /debug
+  /free-agents/{league_key}, /trades/pending, /logout (clears sd_user_id cookie), /debug
 - routers/backtest.py — GET /api/backtest/summary (league_key param, aggregates all leagues),
   POST /sync-week (Yahoo points + was_followed auto-set),
   POST /actual-points (single override), POST /actual-points/bulk, GET /history
 - routers/stats.py — GET /api/stats/week, POST /points-last-three/bulk, GET /current-season
-- routers/ai.py — POST /api/ai/trade (per-user rate limit, league_scoring passthrough),
-  POST /api/ai/waiver (per-user rate limit, league_scoring passthrough),
+- routers/ai.py — POST /api/ai/trade (cookie-based user auth, per-user rate limit,
+  league_scoring passthrough), POST /api/ai/waiver (same),
   GET /api/ai/status (returns user's requests_today, requests_left, requests_limit)
+  Auth: signed sd_user_id cookie; falls back to get_first_user() for solo mode
 
 ### Utils
 - utils/season.py — get_current_season(), get_current_week() (0 if offseason)
@@ -146,8 +148,24 @@ Bottom nav tabs (5 visible):
 ### Environment Variables (Railway + local .env)
 - DATABASE_URL, ODDS_API_KEY, YAHOO_CLIENT_ID, YAHOO_CLIENT_SECRET
 - YAHOO_REDIRECT_URI, FRONTEND_URL
-- ANTHROPIC_API_KEY (spelled ANTHROPIC not ANTROPIC)
+- ANTHROPIC_API_KEY
 - MAX_AI_REQUESTS_PER_DAY=50
+- SECRET_KEY — signs sd_user_id session cookie (generate with secrets.token_hex(32))
+- ENVIRONMENT=production — sets secure=True on cookies (HTTPS only)
+
+## Auth Flow
+VITE_AUTH_ENABLED=true → show Landing if no user.
+Yahoo OAuth → callback saves token to DB + sets signed sd_user_id cookie (httponly, secure)
+→ LeagueSelector Dialog → picks league → scoring format auto-set from Yahoo → ONBOARDED_KEY set.
+selected_league_key in localStorage used by all pages.
+Logout clears localStorage + AuthContext + league settings cache + sd_user_id cookie → returns to Landing.
+
+## Session / Multi-User Architecture
+- AI routes resolve user via signed sd_user_id cookie (httponly, secure in prod)
+- Cookie value = "{user_id}.{hmac_sha256_signature}" — tamper-proof
+- Falls back to get_first_user() when no cookie present — solo mode preserved
+- Yahoo routes still use get_first_user() — safe for read-only data at current scale
+- Full multi-user: swap get_first_user() in yahoo routes with same cookie pattern
 
 ## Database Schema (PostgreSQL on Railway)
 - users — yahoo_id, display_name, email, tokens, scoring_format, scoring_mode
@@ -191,15 +209,7 @@ Cleared on logout and Yahoo reconnect. Falls back to PPR defaults if fetch fails
 - Resets automatically at midnight — date-based, no cron needed
 - check_and_increment_usage(user_id, db) called before every Claude API call
 - get_usage_today(user_id, db) powers the /api/ai/status endpoint
-- Router uses get_first_user() for now — one-line swap when multi-user goes live
-- Frontend shows friendly "Resets at midnight" message on 429
-
-## Auth Flow
-VITE_AUTH_ENABLED=true → show Landing if no user.
-Yahoo OAuth → callback saves token to DB → redirect with ?yahoo_connected=true
-→ LeagueSelector Dialog → picks league → scoring format auto-set from Yahoo → ONBOARDED_KEY set.
-selected_league_key in localStorage used by all pages.
-Logout clears localStorage + AuthContext + league settings cache → returns to Landing.
+- User resolved via signed sd_user_id cookie; falls back to first user in solo mode
 
 ## Deployment
 - Vercel: auto-deploys on git push to main, runs npm run build
@@ -249,33 +259,26 @@ AI features have a paywall stub ready but disabled:
   ✅ LineupEval, PlayerCompare wired end-to-end with real league rules
 ✅ Multi-league and multi-user architecture
 ✅ Real Yahoo matchup data in TeamOverview
-  ✅ get_current_matchup() in yahoo_service.py
-  ✅ GET /auth/yahoo/matchup/{league_key} endpoint
-  ✅ yahooApi.getMatchup() in api.ts
-  ✅ TeamOverview fetches and displays real opponent/projected/actual
-  ✅ Mock fallback during offseason
 ✅ League scoring passed to Claude AI
-  ✅ TradeAnalyzer passes leagueScoring to analyze_trade()
-  ✅ WaiverAssistant passes leagueScoring to analyze_waiver_wire()
-  ✅ Claude now gives advice specific to 6pt TD leagues, first down leagues, etc.
-✅ Per-user AI rate limiting
-  ✅ Replaced global in-memory counter with per-user PostgreSQL tracking
-  ✅ ai_usage table: user_id + date unique constraint, auto-resets daily
-  ✅ check_and_increment_usage() called before every Claude API call
-  ✅ get_usage_today() powers live usage in /api/ai/status
-  ✅ league_scoring passthrough fixed in both AI routes
-  ✅ Frontend 429 handling with "Resets at midnight" message
-  ✅ ai_usage table auto-created on Railway deploy — no manual migration
+✅ Per-user AI rate limiting with PostgreSQL tracking
+✅ Cookie-based session auth for multi-user support
+  ✅ Signed sd_user_id cookie set on Yahoo OAuth callback
+  ✅ httponly + secure (prod) + samesite=lax
+  ✅ AI routes resolve user from cookie, fall back to first user in solo mode
+  ✅ /auth/yahoo/logout clears cookie server-side
+  ✅ SECRET_KEY + ENVIRONMENT vars added to Railway
 
 ## Pending / Next Steps
+- [ ] Top up Railway in August before draft season
 - [ ] Test pending trades with a live Yahoo league
 - [ ] Test real free agents when season starts
 - [ ] Test sync-week with a completed week
 - [ ] Test get_current_matchup with an active league
-- [ ] When season starts: real Odds API props flow to scoring engine automatically
+- [ ] Verify Odds API props data shape matches scoring_service.py at season start
+- [ ] Wire frontend logout to call GET /auth/yahoo/logout (cookie clear)
 - [ ] Future: automate sync-week via Railway cron (Tuesday 10am)
-- [ ] Future: paywall for AI features (AI_PAYWALL_ENABLED flag + is_pro on users table)
-- [ ] Future: push notifications for lineup reminders
+- [ ] Future: swap get_first_user() in yahoo routes → cookie lookup for full multi-user
+- [ ] Future: paywall for AI features (AI_PAYWALL_ENABLED flag + is_pro on users table + Stripe)
+- [ ] Future: push notifications for lineup reminders (highest-value retention feature)
 - [ ] Future: streaming Claude responses for snappier AI UX
 - [ ] Future: add league_key + team_key columns to users table for faster lookups
-- [ ] Future: swap get_first_user() for session-based lookup when multi-user goes live
