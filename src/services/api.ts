@@ -7,6 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
+  withCredentials: true, // send the sd_user_id cookie on every request
 });
 
 // ─── League scoring shape returned by /auth/yahoo/league-settings/:key ───────
@@ -44,7 +45,6 @@ export interface LeagueSettingsResponse {
 }
 
 // ─── Cache for league settings — fetch once per session per league ────────────
-// Stored in localStorage so it persists across page refreshes until manually cleared.
 const LEAGUE_SETTINGS_CACHE_KEY = 'snapdecision_league_settings';
 const LEAGUE_SETTINGS_TTL_MS    = 1000 * 60 * 60 * 6; // 6 hours
 
@@ -70,7 +70,7 @@ function setCachedLeagueSettings(leagueKey: string, data: LeagueSettingsResponse
       JSON.stringify({ data, cachedAt: Date.now() })
     );
   } catch {
-    // localStorage full or unavailable — just skip caching
+    // localStorage full or unavailable — skip caching
   }
 }
 
@@ -100,7 +100,7 @@ export const scoringApi = {
     players:        Player[],
     scoringFormat:  ScoringFormat,
     scoringMode:    string = 'balanced',
-    leagueScoring?: LeagueScoring,        // Pass for personalized league math
+    leagueScoring?: LeagueScoring,
   ) => {
     const res = await api.post('/api/scoring/score', {
       players,
@@ -152,7 +152,7 @@ export const lineupApi = {
     scoringMode:    string = 'balanced',
     week:           number = 14,
     season:         string = '2025',
-    leagueKey?:     string,               // Used to resolve team_id server-side
+    leagueKey?:     string,
     leagueScoring?: LeagueScoring,
   ) => {
     const res = await api.post('/api/lineup/evaluate', {
@@ -213,35 +213,28 @@ export const yahooApi = {
     const res = await api.get(`/auth/yahoo/free-agents/${leagueKey}?${params.toString()}`);
     return res.data;
   },
-
-  /**
-   * Fetch league scoring settings from Yahoo.
-   * Results are cached in localStorage for 6 hours — Yahoo settings
-   * almost never change mid-season so this is safe and fast.
-   */
   getLeagueSettings: async (leagueKey: string): Promise<LeagueSettingsResponse> => {
     const cached = getCachedLeagueSettings(leagueKey);
     if (cached) return cached;
-
     const res  = await api.get(`/auth/yahoo/league-settings/${leagueKey}`);
     const data = res.data as LeagueSettingsResponse;
     setCachedLeagueSettings(leagueKey, data);
     return data;
   },
-
-  /** Clear cached settings for a league (call after reconnecting Yahoo) */
-
   getMatchup: async (leagueKey: string, week?: number) => {
-    const params = week ? `?week=${week}` : "";
+    const params = week ? `?week=${week}` : '';
     const res    = await api.get(`/auth/yahoo/matchup/${leagueKey}${params}`);
     return res.data;
   },
-
+  logout: async () => {
+    // Clears the server-side sd_user_id cookie
+    const res = await api.get('/auth/yahoo/logout');
+    return res.data;
+  },
   clearLeagueSettingsCache: (leagueKey?: string) => {
     if (leagueKey) {
       localStorage.removeItem(`${LEAGUE_SETTINGS_CACHE_KEY}_${leagueKey}`);
     } else {
-      // Clear all cached league settings
       Object.keys(localStorage)
         .filter(k => k.startsWith(LEAGUE_SETTINGS_CACHE_KEY))
         .forEach(k => localStorage.removeItem(k));
@@ -257,7 +250,6 @@ export const backtestApi = {
     const res = await api.get(`/api/backtest/summary?${params.toString()}`);
     return res.data;
   },
-
   getHistory: async (season: string = '2025', week?: number, leagueKey?: string) => {
     const params = new URLSearchParams({ season });
     if (week) params.append('week', week.toString());
@@ -265,15 +257,6 @@ export const backtestApi = {
     const res = await api.get(`/api/backtest/history?${params.toString()}`);
     return res.data;
   },
-
-  /**
-   * Sync actual points from Yahoo for a completed week.
-   * Call this once after Monday Night Football finishes
-   * (or Tuesday morning when stats are finalized).
-   *
-   * This is the core of backtest accuracy — one tap replaces
-   * 15+ manual entries and also sets was_followed automatically.
-   */
   syncWeek: async (leagueKey: string, week: number, season: string = '2025') => {
     const res = await api.post('/api/backtest/sync-week', {
       league_key: leagueKey,
@@ -282,8 +265,6 @@ export const backtestApi = {
     });
     return res.data;
   },
-
-  /** Manual single-player override (for correcting bad Yahoo data) */
   logActualPoints: async (
     leagueKey:  string,
     week:       number,
@@ -300,8 +281,6 @@ export const backtestApi = {
     });
     return res.data;
   },
-
-  /** Bulk manual override for multiple players at once */
   bulkLogActualPoints: async (
     leagueKey: string,
     week:      number,

@@ -55,7 +55,16 @@ export const useAuth = () => {
     check();
   }, []);
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // Clear the server-side session cookie first, then clean up localStorage.
+      // Fire-and-forget is intentional — if the backend is unreachable we still
+      // want the user logged out on the frontend.
+      await yahooApi.logout();
+    } catch {
+      // ignore — local logout still proceeds
+    }
+    yahooApi.clearLeagueSettingsCache();
     localStorage.removeItem('yahoo_connected');
     setUser(null);
   };
