@@ -9,6 +9,12 @@ export interface OddsGame {
   home_spread:   number | null;
   away_spread:   number | null;
   total:         number | null;
+  // Score fields — populated for live and completed games
+  completed:     boolean;
+  live:          boolean;
+  home_score:    number | null;
+  away_score:    number | null;
+  last_update:   string | null;
 }
 
 export interface OddsWeek {
@@ -18,14 +24,14 @@ export interface OddsWeek {
 }
 
 export const useNflEvents = () => {
-  const [weeks, setWeeks]           = useState<OddsWeek[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
+  const [weeks, setWeeks]             = useState<OddsWeek[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [totalGames, setTotalGames] = useState(0);
+  const [totalGames, setTotalGames]   = useState(0);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchEvents = async () => {
       try {
         setLoading(true);
         const data = await oddsApi.getEvents();
@@ -39,7 +45,14 @@ export const useNflEvents = () => {
         setLoading(false);
       }
     };
-    fetch();
+
+    fetchEvents();
+
+    // Re-fetch every 60 seconds during the season so live scores stay fresh.
+    // The scores endpoint updates ~every 30s on the API side; 60s is a
+    // reasonable polling interval that won't burn through rate limits.
+    const interval = setInterval(fetchEvents, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   return { weeks, loading, error, lastUpdated, totalGames };
