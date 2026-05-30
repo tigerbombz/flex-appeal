@@ -1,4 +1,4 @@
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Skeleton } from '@mui/material';
 import {
   BarChart,
   Bar,
@@ -12,19 +12,32 @@ import {
 } from 'recharts';
 import { mockMatchupHistory } from '../data/mockData';
 
+interface MatchupEntry {
+  week:          number;
+  opponent:      string;
+  result:        'W' | 'L';
+  pointsFor:     number;
+  pointsAgainst: number;
+}
+
+interface Props {
+  history?:  MatchupEntry[];
+  loading?:  boolean;
+  isRealData?: boolean;
+}
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   const data = payload[0].payload;
-
   return (
     <Box
       sx={{
-        bgcolor: 'background.paper',
-        border: '1px solid',
+        bgcolor:     'background.paper',
+        border:      '1px solid',
         borderColor: 'divider',
         borderRadius: 2,
-        p: 1.5,
-        minWidth: 140,
+        p:           1.5,
+        minWidth:    140,
       }}
     >
       <Typography sx={{ fontSize: 12, fontWeight: 700, mb: 0.5 }}>
@@ -43,28 +56,42 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-const MatchHistoryChart = () => {
-  const wins   = mockMatchupHistory.filter((m) => m.result === 'W').length;
-  const losses = mockMatchupHistory.filter((m) => m.result === 'L').length;
-  const avgPts = (
-    mockMatchupHistory.reduce((sum, m) => sum + m.pointsFor, 0) /
-    mockMatchupHistory.length
-  ).toFixed(1);
+const MatchHistoryChart = ({ history, loading, isRealData }: Props) => {
+  // Use real data if available, otherwise fall back to mock
+  const data   = (isRealData && history && history.length > 0) ? history : mockMatchupHistory;
+  const isReal = isRealData && history && history.length > 0;
+
+  const wins   = data.filter((m) => m.result === 'W').length;
+  const losses = data.filter((m) => m.result === 'L').length;
+  const avgPts = data.length
+    ? (data.reduce((sum, m) => sum + m.pointsFor, 0) / data.length).toFixed(1)
+    : '0.0';
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Skeleton variant="rounded" height={60} sx={{ flex: 1, borderRadius: 2 }} />
+          <Skeleton variant="rounded" height={60} sx={{ flex: 1, borderRadius: 2 }} />
+          <Skeleton variant="rounded" height={60} sx={{ flex: 1, borderRadius: 2 }} />
+        </Box>
+        <Skeleton variant="rounded" height={180} sx={{ borderRadius: 2 }} />
+      </Box>
+    );
+  }
 
   return (
     <Box>
+      {/* Mock data notice */}
+      {!isReal && (
+        <Typography sx={{ fontSize: 11, color: 'text.disabled', mb: 1.5, fontStyle: 'italic' }}>
+          Showing sample data — real record loads once season starts
+        </Typography>
+      )}
+
       {/* Summary row */}
       <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-        <Box
-          sx={{
-            flex: 1,
-            bgcolor: '#22c55e15',
-            border: '1px solid #22c55e30',
-            borderRadius: 2,
-            p: 1.5,
-            textAlign: 'center',
-          }}
-        >
+        <Box sx={{ flex: 1, bgcolor: '#22c55e15', border: '1px solid #22c55e30', borderRadius: 2, p: 1.5, textAlign: 'center' }}>
           <Typography sx={{ fontSize: 22, fontWeight: 700, color: '#22c55e', lineHeight: 1 }}>
             {wins}
           </Typography>
@@ -72,16 +99,7 @@ const MatchHistoryChart = () => {
             Wins
           </Typography>
         </Box>
-        <Box
-          sx={{
-            flex: 1,
-            bgcolor: '#ef444415',
-            border: '1px solid #ef444430',
-            borderRadius: 2,
-            p: 1.5,
-            textAlign: 'center',
-          }}
-        >
+        <Box sx={{ flex: 1, bgcolor: '#ef444415', border: '1px solid #ef444430', borderRadius: 2, p: 1.5, textAlign: 'center' }}>
           <Typography sx={{ fontSize: 22, fontWeight: 700, color: '#ef4444', lineHeight: 1 }}>
             {losses}
           </Typography>
@@ -89,17 +107,7 @@ const MatchHistoryChart = () => {
             Losses
           </Typography>
         </Box>
-        <Box
-          sx={{
-            flex: 1,
-            bgcolor: 'background.paper',
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 2,
-            p: 1.5,
-            textAlign: 'center',
-          }}
-        >
+        <Box sx={{ flex: 1, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 1.5, textAlign: 'center' }}>
           <Typography sx={{ fontSize: 22, fontWeight: 700, color: 'primary.main', lineHeight: 1 }}>
             {avgPts}
           </Typography>
@@ -112,28 +120,14 @@ const MatchHistoryChart = () => {
       {/* Bar chart */}
       <Box sx={{ width: '100%', height: 180 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={mockMatchupHistory}
-            margin={{ top: 4, right: 4, left: -24, bottom: 0 }}
-            barSize={18}
-          >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#2a2f3d"
-              vertical={false}
-            />
+          <BarChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }} barSize={18}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#2a2f3d" vertical={false} />
             <XAxis
               dataKey="week"
               tick={{ fill: '#7a8099', fontSize: 10 }}
               tickLine={false}
               axisLine={false}
-              label={{
-                value: 'Week',
-                position: 'insideBottom',
-                offset: -2,
-                fill: '#7a8099',
-                fontSize: 10,
-              }}
+              label={{ value: 'Week', position: 'insideBottom', offset: -2, fill: '#7a8099', fontSize: 10 }}
             />
             <YAxis
               tick={{ fill: '#7a8099', fontSize: 10 }}
@@ -141,23 +135,11 @@ const MatchHistoryChart = () => {
               axisLine={false}
               domain={[60, 160]}
             />
-            <Tooltip
-              content={<CustomTooltip />}
-              cursor={{ fill: '#ffffff08' }}
-            />
-            <ReferenceLine
-              y={parseFloat(avgPts)}
-              stroke="#00e5a0"
-              strokeDasharray="4 4"
-              strokeWidth={1}
-            />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#ffffff08' }} />
+            <ReferenceLine y={parseFloat(avgPts)} stroke="#00e5a0" strokeDasharray="4 4" strokeWidth={1} />
             <Bar dataKey="pointsFor" radius={[4, 4, 0, 0]}>
-              {mockMatchupHistory.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={entry.result === 'W' ? '#22c55e' : '#ef4444'}
-                  opacity={0.85}
-                />
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.result === 'W' ? '#22c55e' : '#ef4444'} opacity={0.85} />
               ))}
             </Bar>
           </BarChart>
