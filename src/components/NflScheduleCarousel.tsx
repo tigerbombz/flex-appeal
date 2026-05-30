@@ -25,18 +25,17 @@ const formatSpread = (spread: number | null): string => {
 
 // ─── Individual game row ──────────────────────────────────────────────────────
 const GameRow = ({ game }: { game: OddsGame }) => {
-  const isCompleted = game.completed;
-  const isLive      = game.live && !game.completed;
-  const hasScore    = game.home_score !== null && game.away_score !== null;
-
-  // Who's winning (for live score highlight)
-  const homeWinning = hasScore && game.home_score! > game.away_score!;
-  const awayWinning = hasScore && game.away_score! > game.home_score!;
+  const isCompleted  = game.completed;
+  const isLive       = game.live && !game.completed;
+  const hasScore     = game.home_score !== null && game.away_score !== null;
+  const showScore    = hasScore && (isLive || isCompleted); // only show score once game starts
+  const homeWinning  = hasScore && game.home_score! > game.away_score!;
+  const awayWinning  = hasScore && game.away_score! > game.home_score!;
 
   return (
     <Box
       sx={{
-        bgcolor:      isCompleted ? 'background.default' : 'background.default',
+        bgcolor:      'background.default',
         borderRadius: 2,
         px:           1.5,
         py:           1.25,
@@ -44,12 +43,11 @@ const GameRow = ({ game }: { game: OddsGame }) => {
         alignItems:   'center',
         gap:          1,
         opacity:      isCompleted ? 0.65 : 1,
-        position:     'relative',
-        // Subtle left border accent for live games
+        // Subtle left accent for live games
         borderLeft:   isLive ? '3px solid #22c55e' : '3px solid transparent',
       }}
     >
-      {/* Teams + spreads */}
+      {/* Teams + spreads — always visible */}
       <Box sx={{ flex: 1, minWidth: 0 }}>
 
         {/* Away team */}
@@ -64,8 +62,8 @@ const GameRow = ({ game }: { game: OddsGame }) => {
           >
             {game.away_team}
           </Typography>
-          {/* Show spread for upcoming games, hide for live/completed */}
-          {!hasScore && game.away_spread !== null && (
+          {/* Spread always shown if available */}
+          {game.away_spread !== null && (
             <Chip
               label={formatSpread(game.away_spread)}
               size="small"
@@ -94,7 +92,7 @@ const GameRow = ({ game }: { game: OddsGame }) => {
           >
             {game.home_team}
           </Typography>
-          {!hasScore && game.home_spread !== null && (
+          {game.home_spread !== null && (
             <Chip
               label={formatSpread(game.home_spread)}
               size="small"
@@ -112,9 +110,9 @@ const GameRow = ({ game }: { game: OddsGame }) => {
         </Box>
       </Box>
 
-      {/* Right side: score or O/U + time */}
+      {/* Right side: score when live/final, O/U + time when upcoming */}
       <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-        {hasScore ? (
+        {showScore ? (
           // Live or final score
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}>
@@ -126,7 +124,6 @@ const GameRow = ({ game }: { game: OddsGame }) => {
                     borderRadius: '50%',
                     bgcolor:      '#22c55e',
                     flexShrink:   0,
-                    // Pulsing dot for live games
                     animation:    'pulse 1.5s ease-in-out infinite',
                     '@keyframes pulse': {
                       '0%, 100%': { opacity: 1 },
@@ -168,7 +165,7 @@ const GameRow = ({ game }: { game: OddsGame }) => {
             )}
           </Box>
         ) : (
-          // Upcoming — show O/U and tip-off time
+          // Upcoming — O/U total + date/time, same as original
           <Box>
             {game.total !== null && (
               <Typography sx={{ fontSize: 12, fontWeight: 600, color: 'primary.main', mb: 0.25 }}>
@@ -208,9 +205,11 @@ const NflScheduleCarousel = ({ weeks }: Props) => {
     return `Preseason Week ${Math.abs(w.week)}`;
   };
 
-  // Count live games in current week for the header badge
   const liveCount      = currentWeek.games.filter((g) => g.live && !g.completed).length;
   const completedCount = currentWeek.games.filter((g) => g.completed).length;
+
+  const liveOrUpcoming = currentWeek.games.filter((g) => !g.completed);
+  const completed      = currentWeek.games.filter((g) => g.completed);
 
   return (
     <Box
@@ -249,18 +248,17 @@ const NflScheduleCarousel = ({ weeks }: Props) => {
             <Typography sx={{ fontSize: 14, fontWeight: 700 }}>
               {getSeasonLabel(currentWeek)}
             </Typography>
-            {/* Live badge in header if any games are live */}
             {liveCount > 0 && (
               <Chip
                 label={`${liveCount} Live`}
                 size="small"
                 sx={{
-                  fontSize:  9,
-                  height:    18,
+                  fontSize:   9,
+                  height:     18,
                   fontWeight: 700,
-                  bgcolor:   '#22c55e20',
-                  color:     '#22c55e',
-                  border:    '1px solid #22c55e40',
+                  bgcolor:    '#22c55e20',
+                  color:      '#22c55e',
+                  border:     '1px solid #22c55e40',
                 }}
               />
             )}
@@ -303,33 +301,24 @@ const NflScheduleCarousel = ({ weeks }: Props) => {
         ))}
       </Box>
 
-      {/* Games list — sorted by backend: live → upcoming → completed */}
+      {/* Games list */}
       <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {/* Divider between upcoming and completed if both exist */}
-        {(() => {
-          const liveOrUpcoming = currentWeek.games.filter((g) => !g.completed);
-          const completed      = currentWeek.games.filter((g) => g.completed);
-
-          return (
-            <>
-              {liveOrUpcoming.map((game) => (
-                <GameRow key={game.id} game={game} />
-              ))}
-              {completed.length > 0 && liveOrUpcoming.length > 0 && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 0.5 }}>
-                  <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
-                  <Typography sx={{ fontSize: 10, color: 'text.disabled', whiteSpace: 'nowrap' }}>
-                    Final scores
-                  </Typography>
-                  <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
-                </Box>
-              )}
-              {completed.map((game) => (
-                <GameRow key={game.id} game={game} />
-              ))}
-            </>
-          );
-        })()}
+        {liveOrUpcoming.map((game) => (
+          <GameRow key={game.id} game={game} />
+        ))}
+        {/* Divider between upcoming and completed */}
+        {completed.length > 0 && liveOrUpcoming.length > 0 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, my: 0.5 }}>
+            <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
+            <Typography sx={{ fontSize: 10, color: 'text.disabled', whiteSpace: 'nowrap' }}>
+              Final scores
+            </Typography>
+            <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
+          </Box>
+        )}
+        {completed.map((game) => (
+          <GameRow key={game.id} game={game} />
+        ))}
       </Box>
 
       {/* Footer legend */}
